@@ -12,7 +12,7 @@ export class Slingshot {
   private graphics: PIXI.Graphics;
   private trajectoryGraphics: PIXI.Graphics;
   private maxStretch: number = 120; // Reduced for better control
-  private forceMultiplier: number = 0.0008; // Much lower for realistic speed
+  private forceMultiplier: number = 0.0014; // Much lower for realistic speed
 
   constructor(game: Game) {
     this.game = game;
@@ -53,24 +53,19 @@ export class Slingshot {
     }
   }
 
-    release(): { x: number; y: number } {
+  release(): { x: number; y: number } {
     this.isDragging = false;
-
+    
     // Calculate launch force (opposite of drag direction)
-    // Increase multiplier so the physics engine actually notices it.
-    // You can tune FORCE_MULTIPLIER between 0.005 and 0.06 depending on feel.
-    const FORCE_MULTIPLIER = 0.0008;
-
-    const forceX = (this.anchorX - this.dragX) * FORCE_MULTIPLIER;
-    const forceY = (this.anchorY - this.dragY) * FORCE_MULTIPLIER;
-
+    const forceX = (this.anchorX - this.dragX) * this.forceMultiplier;
+    const forceY = (this.anchorY - this.dragY) * this.forceMultiplier;
+    
     // Reset drag position
     this.dragX = this.anchorX;
     this.dragY = this.anchorY;
-
+    
     return { x: forceX, y: forceY };
   }
-
 
   update(): void {
     this.graphics.clear();
@@ -149,31 +144,35 @@ export class Slingshot {
       y: (this.anchorY - this.dragY) * this.forceMultiplier
     };
     
-    // Simulate bird mass (approximate)
+    // Simulate bird mass
     const mass = 0.002;
     const gravityY = 2; // Match engine gravity
     
-    // Initial velocity from force
-    let vx = (force.x / mass) * 60; // Convert to velocity
-    let vy = (force.y / mass) * 60;
+    // Calculate initial velocity from force
+    // Force = mass * acceleration, so acceleration = force / mass
+    // Velocity = acceleration * time (we apply force over 1 frame at 60fps)
+    let vx = (force.x / mass) * 1;
+    let vy = (force.y / mass) * 1;
     
     let x = this.dragX;
     let y = this.dragY;
+    
+    const timeStep = 1 / 60; // 60 FPS
     
     // Simulate trajectory with physics
     for (let i = 0; i < numPoints; i++) {
       points.push({ x, y });
       
-      // Update position
-      x += vx * 0.016; // 60 FPS timestep
-      y += vy * 0.016;
+      // Update position (velocity * time)
+      x += vx * timeStep * 60;
+      y += vy * timeStep * 60;
       
-      // Apply gravity
-      vy += gravityY * 60 * 0.016;
+      // Apply gravity (acceleration)
+      vy += gravityY;
       
       // Apply air resistance
-      vx *= 0.99;
-      vy *= 0.99;
+      vx *= 0.995;
+      vy *= 0.995;
       
       // Stop if trajectory goes off screen or hits ground
       if (y > 1000 || x > 2000 || x < 0) break;
