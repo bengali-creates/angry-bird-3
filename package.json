@@ -4,7 +4,7 @@
   "description": "Cross-platform 2D physics-based game inspired by Angry Birds",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite ",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit"

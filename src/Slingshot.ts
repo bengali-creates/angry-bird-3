@@ -11,7 +11,7 @@ export class Slingshot {
   private game: Game;
   private graphics: PIXI.Graphics;
   private trajectoryGraphics: PIXI.Graphics;
-  private maxStretch: number = 120; // Reduced for better control
+  private maxStretch: number = 100; // Reduced for better control
   private forceMultiplier: number = 0.0014; // Much lower for realistic speed
 
   constructor(game: Game) {

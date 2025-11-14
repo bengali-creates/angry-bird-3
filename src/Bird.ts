@@ -27,8 +27,8 @@ export class Bird {
     // Create physics body
     this.body = Matter.Bodies.circle(x, y, this.radius, {
       density: this.getDensity(),
-      restitution: 0.6,
-      friction: 0.5
+      restitution: 0.29,
+      friction: 0.3
     });
     
     Matter.World.add(this.game.getWorld(), this.body);
@@ -61,12 +61,12 @@ export class Bird {
 
   private getDensity(): number {
     switch (this.type) {
-      case 'red': return 0.0025;   // Strong and heavy
-      case 'blue': return 0.0015;   // Light (splits into 3)
-      case 'yellow': return 0.0022; // Medium (speed)
-      case 'black': return 0.004;   // Very heavy (explosive)
-      case 'white': return 0.003;   // Heavy (drops egg)
-      default: return 0.002;
+      case 'red': return 0.025;   // Strong and heavy
+      case 'blue': return 0.015;   // Light (splits into 3)
+      case 'yellow': return 0.02; // Medium (speed)
+      case 'black': return 0.04;   // Very heavy (explosive)
+      case 'white': return 0.03;   // Heavy (drops egg)
+      default: return 0.02;
     }
   }
 
@@ -494,6 +494,9 @@ export class Bird {
 
   isSettled(): boolean {
     return this.settleTime > 60; // Settled for 1 second at 60 FPS
+  }
+  getRadiusOut(): number {
+    return this.radius;
   }
 
   destroy(): void {
