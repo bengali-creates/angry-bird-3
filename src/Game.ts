@@ -5,6 +5,7 @@ import { Level } from "./Level";
 import { Bird, type BirdType } from "./Bird";
 import { AudioManager } from "./AudioManager";
 import { UI } from "./UI";
+import { MenuManager } from "./MenuManager";
 
 export class Game {
   private app: Application;
@@ -16,15 +17,17 @@ export class Game {
   private audioManager: AudioManager;
   private pixiContainer: Container;
   private ui: UI;
+  private menuManager: MenuManager;
 
   private score: number = 0;
   private availableBirds: BirdType[] = [];
   private birdsUsed: number = 0;
   private isLevelComplete: boolean = false;
   private isGameOver: boolean = false;
+  private isPlaying: boolean = false;
 
-  // Responsive viewport settings
-  private baseWidth = 1920;
+  // IMPROVED: Much wider world for proper Angry Birds spacing
+  private baseWidth = 3000; // Increased from 2400 for MUCH more space
   private baseHeight = 1080;
   private scale = 1;
 
@@ -34,7 +37,7 @@ export class Game {
   
   // Ability triggering
   private canActivateAbility: boolean = false;
-  private abilityActivationDelay: number = 300; // ms after launch
+  private abilityActivationDelay: number = 300;
 
   constructor() {
     this.app = new Application();
@@ -49,6 +52,7 @@ export class Game {
     this.slingshot = new Slingshot(this);
     this.level = new Level(this, this.baseWidth, this.baseHeight);
     this.ui = new UI(this, this.baseWidth, this.baseHeight);
+    this.menuManager = new MenuManager(this);
   }
 
   async init(): Promise<void> {
@@ -74,6 +78,7 @@ export class Game {
 
     this.app.stage.addChild(this.pixiContainer);
     this.app.stage.addChild(this.ui.getContainer());
+    this.app.stage.addChild(this.menuManager.getContainer());
 
     this.setupResponsiveViewport();
     window.addEventListener("resize", () => this.onResize());
@@ -84,21 +89,24 @@ export class Game {
     this.app.ticker.add(() => this.update());
     this.setupInputHandlers();
 
-    await this.level.load(1);
-    this.slingshot.setPosition(this.baseWidth * 0.08, this.baseHeight * 0.78);
-    this.spawnNextBird();
+    // IMPROVED: Slingshot positioned for optimal spacing
+    this.slingshot.setPosition(this.baseWidth * 0.10, this.baseHeight * 0.78);
+    
+    this.menuManager.showMainMenu();
+    this.pixiContainer.visible = false;
+    this.ui.getContainer().visible = false;
   }
 
   private setupResponsiveViewport(): void {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
-    // Calculate scale to cover more screen - fit to height primarily
+    // IMPROVED: Better responsive scaling for all devices
     const scaleX = vw / this.baseWidth;
     const scaleY = vh / this.baseHeight;
     
-    // Use larger scale to fill more screen space
-    this.scale = Math.max(scaleX, scaleY * 0.95);
+    // Ensure we scale to fit the screen properly
+    this.scale = Math.max(scaleX, scaleY * 0.92);
     
     this.pixiContainer.scale.set(this.scale);
 
@@ -106,8 +114,8 @@ export class Game {
     const scaledWidth = this.baseWidth * this.scale;
     const scaledHeight = this.baseHeight * this.scale;
     
-    const offsetX = (vw - scaledWidth) / 2;
-    const offsetY = vh - scaledHeight;
+    const offsetX = Math.max(0, (vw - scaledWidth) / 2);
+    const offsetY = Math.max(0, vh - scaledHeight);
 
     this.pixiContainer.position.set(offsetX, offsetY);
     this.ui.updateScale(this.scale, vw, vh);
@@ -143,9 +151,11 @@ export class Game {
       (e: PointerEvent) => {
         if (!e.isPrimary) return;
         e.preventDefault();
+        
+        if (!this.isPlaying) return;
+        
         const p = this.screenToWorld(e.clientX, e.clientY);
         
-        // Check if clicking on bird for slingshot
         if (this.currentBird && !this.currentBird.isLaunched) {
           const dx = p.x - this.currentBird.body.position.x;
           const dy = p.y - this.currentBird.body.position.y;
@@ -158,7 +168,6 @@ export class Game {
         
         this.onPointerDown(p.x, p.y);
         
-        // If not dragging slingshot, treat as ability activation
         if (!isDraggingSlingshot) {
           this.onAbilityActivate();
         }
@@ -171,6 +180,7 @@ export class Game {
       (e: PointerEvent) => {
         if (!e.isPrimary) return;
         e.preventDefault();
+        if (!this.isPlaying) return;
         const p = this.screenToWorld(e.clientX, e.clientY);
         this.onPointerMove(p.x, p.y);
       },
@@ -182,6 +192,7 @@ export class Game {
       (e: PointerEvent) => {
         if (!e.isPrimary) return;
         e.preventDefault();
+        if (!this.isPlaying) return;
         const p = this.screenToWorld(e.clientX, e.clientY);
         this.onPointerUp(p.x, p.y);
         isDraggingSlingshot = false;
@@ -215,7 +226,7 @@ export class Game {
   private onPointerUp(worldX: number, worldY: number): void {
     if (this.slingshot.isDragging && this.currentBird && !this.currentBird.isLaunched) {
       const force = this.slingshot.release();
-      const worldScaleFactor = this.baseWidth / 1920;
+      const worldScaleFactor = this.baseWidth / 3000;
       const launchMultiplier = 0.6 * worldScaleFactor;
       this.launchBird(force.x * launchMultiplier, force.y * launchMultiplier);
       this.audioManager.play("birdLaunch");
@@ -334,6 +345,8 @@ export class Game {
     const stars = this.level.getStarRating(this.score);
     this.audioManager.play("levelComplete");
     
+    this.menuManager.updateLevelProgress(this.level.currentLevel, stars, this.score);
+    
     setTimeout(() => {
       this.ui.showLevelComplete(this.level.currentLevel, this.score, stars, birdBonus);
     }, 500);
@@ -352,6 +365,10 @@ export class Game {
     
     const stars = this.level.getStarRating(this.score);
     
+    if (stars > 0) {
+      this.menuManager.updateLevelProgress(this.level.currentLevel, stars, this.score);
+    }
+    
     setTimeout(() => {
       this.ui.showGameOver(this.level.currentLevel, this.score, stars);
     }, 500);
@@ -365,13 +382,29 @@ export class Game {
 
   public nextLevel(): void {
     this.resetGameState();
-    this.level.load(this.level.currentLevel + 1);
-    this.spawnNextBird();
+    const nextLevelNum = this.level.currentLevel + 1;
+    if (nextLevelNum <= this.level.getTotalLevels()) {
+      this.level.load(nextLevelNum);
+      this.spawnNextBird();
+    } else {
+      this.goToMenu();
+    }
   }
 
   public goToMenu(): void {
     this.resetGameState();
-    this.level.load(1);
+    this.isPlaying = false;
+    this.pixiContainer.visible = false;
+    this.ui.getContainer().visible = false;
+    this.menuManager.showLevelSelect();
+  }
+
+  public startLevel(levelNumber: number): void {
+    this.resetGameState();
+    this.isPlaying = true;
+    this.pixiContainer.visible = true;
+    this.ui.getContainer().visible = true;
+    this.level.load(levelNumber);
     this.spawnNextBird();
   }
 
@@ -415,14 +448,14 @@ export class Game {
   }
 
   private update(): void {
-    if (!this.isLevelComplete && !this.isGameOver) {
+    if (this.isPlaying && !this.isLevelComplete && !this.isGameOver) {
       Matter.Engine.update(this.engine, 1000 / 60);
       this.level.update();
       if (this.currentBird) {
         this.currentBird.update();
       }
       this.slingshot.update();
-    } else {
+    } else if (this.isPlaying) {
       Matter.Engine.update(this.engine, 1000 / 60);
       this.level.update();
       if (this.currentBird) {
@@ -440,4 +473,5 @@ export class Game {
   getScore() { return this.score; }
   getLevel() { return this.level; }
   getScale() { return this.scale; }
+  getMenuManager() { return this.menuManager; }
 }

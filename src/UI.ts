@@ -231,12 +231,14 @@ export class UI {
     }
 
     const buttonY = panelY + panelHeight * 0.85;
-    const buttonSize = Math.min(200, panelWidth * 0.35);
-    this.createButton('NEXT', vw / 2 - buttonSize * 0.6, buttonY, buttonSize, () => {
+    const buttonSize = Math.min(180, panelWidth * 0.32);
+    const buttonSpacing = buttonSize + 20;
+    // Fixed: Better button spacing to prevent overlap
+    this.createButton('NEXT', vw / 2 - buttonSpacing / 2, buttonY, buttonSize, () => {
       this.game.nextLevel();
     });
 
-    this.createButton('RETRY', vw / 2 + buttonSize * 0.1, buttonY, buttonSize * 0.8, () => {
+    this.createButton('RETRY', vw / 2 + 10, buttonY, buttonSize, () => {
       this.game.restartLevel();
     });
   }
@@ -332,12 +334,14 @@ export class UI {
     this.endScreenContainer.addChild(scoreText);
 
     const buttonY = stars > 0 ? panelY + panelHeight * 0.88 : panelY + panelHeight * 0.8;
-    const buttonSize = Math.min(200, panelWidth * 0.35);
-    this.createButton('RETRY', vw / 2 - buttonSize * 0.6, buttonY, buttonSize, () => {
+    const buttonSize = Math.min(180, panelWidth * 0.32);
+    const buttonSpacing = buttonSize + 20;
+    // Fixed: Better button spacing to prevent overlap
+    this.createButton('RETRY', vw / 2 - buttonSpacing / 2, buttonY, buttonSize, () => {
       this.game.restartLevel();
     });
 
-    this.createButton('MENU', vw / 2 + buttonSize * 0.1, buttonY, buttonSize * 0.8, () => {
+    this.createButton('MENU', vw / 2 + 10, buttonY, buttonSize, () => {
       this.game.goToMenu();
     });
   }

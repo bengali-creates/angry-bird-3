@@ -96,29 +96,50 @@ export class Level {
       this.blocks.push(block);
     });
 
-    // Create pigs
+    // Create pigs - FIXED: Adjust spawn position to prevent ground collision death
     config.structure.pigs.forEach(p => {
       const x = p.x * this.virtualWidth;
-      const y = p.y * this.virtualHeight;
+      let y = p.y * this.virtualHeight;
+      
+      // Get pig size for radius calculation
+      let pigRadius = 20;
+      switch (p.size) {
+        case 'small': pigRadius = 20; break;
+        case 'medium': pigRadius = 30; break;
+        case 'large': pigRadius = 40; break;
+      }
+      
+      // Ensure pig spawns above ground with clearance
+      const groundTop = this.virtualHeight * 0.91; // Ground starts here
+      const minY = groundTop - pigRadius - 5; // Add 5px clearance
+      
+      if (y > minY) {
+        y = minY;
+      }
+      
       const pig = new Pig(x, y, p.size, this.game);
       this.pigs.push(pig);
     });
   }
 
+  getTotalLevels(): number {
+    return 8; // We have 8 predefined levels
+  }
+
   private getLevelConfig(levelNumber: number): LevelConfig {
     const levels: LevelConfig[] = [
-      // LEVEL 1 - Tutorial
+      // LEVEL 1 - Tutorial (structures moved further from slingshot)
       {
         levelNumber: 1,
         birds: ['red', 'red', 'red'],
         structure: {
           blocks: [
-            { x: 1200 / 1920, y: 950 / 1080, width: 20 / 1920, height: 200 / 1080, material: 'wood' },
-            { x: 1350 / 1920, y: 950 / 1080, width: 20 / 1920, height: 200 / 1080, material: 'wood' },
-            { x: 1275 / 1920, y: 850 / 1080, width: 180 / 1920, height: 20 / 1080, material: 'wood' },
+            { x: 1500 / 2400, y: 920 / 1080, width: 20 / 2400, height: 160 / 1080, material: 'wood' },
+            { x: 1650 / 2400, y: 920 / 1080, width: 20 / 2400, height: 160 / 1080, material: 'wood' },
+            { x: 1575 / 2400, y: 840 / 1080, width: 180 / 2400, height: 20 / 1080, material: 'wood' },
           ],
           pigs: [
-            { x: 1275 / 1920, y: 920 / 1080, size: 'small' }
+            { x: 1575 / 2400, y: 880 / 1080, size: 'small' }
           ]
         },
         threeStarScore: 15000,
@@ -132,16 +153,16 @@ export class Level {
         birds: ['red', 'blue', 'red', 'blue'],
         structure: {
           blocks: [
-            { x: 1150 / 1920, y: 950 / 1080, width: 20 / 1920, height: 150 / 1080, material: 'wood' },
-            { x: 1400 / 1920, y: 950 / 1080, width: 20 / 1920, height: 150 / 1080, material: 'wood' },
-            { x: 1275 / 1920, y: 875 / 1080, width: 280 / 1920, height: 20 / 1080, material: 'wood' },
-            { x: 1200 / 1920, y: 820 / 1080, width: 20 / 1920, height: 100 / 1080, material: 'wood' },
-            { x: 1350 / 1920, y: 820 / 1080, width: 20 / 1920, height: 100 / 1080, material: 'wood' },
-            { x: 1275 / 1920, y: 750 / 1080, width: 180 / 1920, height: 20 / 1080, material: 'wood' },
+            { x: 1450 / 2400, y: 920 / 1080, width: 20 / 2400, height: 150 / 1080, material: 'wood' },
+            { x: 1700 / 2400, y: 920 / 1080, width: 20 / 2400, height: 150 / 1080, material: 'wood' },
+            { x: 1575 / 2400, y: 845 / 1080, width: 280 / 2400, height: 20 / 1080, material: 'wood' },
+            { x: 1500 / 2400, y: 790 / 1080, width: 20 / 2400, height: 100 / 1080, material: 'wood' },
+            { x: 1650 / 2400, y: 790 / 1080, width: 20 / 2400, height: 100 / 1080, material: 'wood' },
+            { x: 1575 / 2400, y: 720 / 1080, width: 180 / 2400, height: 20 / 1080, material: 'wood' },
           ],
           pigs: [
-            { x: 1275 / 1920, y: 950 / 1080, size: 'small' },
-            { x: 1275 / 1920, y: 800 / 1080, size: 'small' }
+            { x: 1575 / 2400, y: 880 / 1080, size: 'small' },
+            { x: 1575 / 2400, y: 770 / 1080, size: 'small' }
           ]
         },
         threeStarScore: 25000,
@@ -155,19 +176,19 @@ export class Level {
         birds: ['red', 'yellow', 'blue', 'red'],
         structure: {
           blocks: [
-            { x: 1100 / 1920, y: 950 / 1080, width: 20 / 1920, height: 200 / 1080, material: 'stone' },
-            { x: 1200 / 1920, y: 950 / 1080, width: 20 / 1920, height: 200 / 1080, material: 'stone' },
-            { x: 1300 / 1920, y: 950 / 1080, width: 20 / 1920, height: 200 / 1080, material: 'stone' },
-            { x: 1400 / 1920, y: 950 / 1080, width: 20 / 1920, height: 200 / 1080, material: 'stone' },
-            { x: 1250 / 1920, y: 850 / 1080, width: 320 / 1920, height: 20 / 1080, material: 'wood' },
-            { x: 1150 / 1920, y: 800 / 1080, width: 20 / 1920, height: 100 / 1080, material: 'stone' },
-            { x: 1350 / 1920, y: 800 / 1080, width: 20 / 1920, height: 100 / 1080, material: 'stone' },
-            { x: 1250 / 1920, y: 740 / 1080, width: 220 / 1920, height: 20 / 1080, material: 'stone' },
+            { x: 1400 / 2400, y: 920 / 1080, width: 20 / 2400, height: 200 / 1080, material: 'stone' },
+            { x: 1500 / 2400, y: 920 / 1080, width: 20 / 2400, height: 200 / 1080, material: 'stone' },
+            { x: 1600 / 2400, y: 920 / 1080, width: 20 / 2400, height: 200 / 1080, material: 'stone' },
+            { x: 1700 / 2400, y: 920 / 1080, width: 20 / 2400, height: 200 / 1080, material: 'stone' },
+            { x: 1550 / 2400, y: 820 / 1080, width: 320 / 2400, height: 20 / 1080, material: 'wood' },
+            { x: 1450 / 2400, y: 770 / 1080, width: 20 / 2400, height: 100 / 1080, material: 'stone' },
+            { x: 1650 / 2400, y: 770 / 1080, width: 20 / 2400, height: 100 / 1080, material: 'stone' },
+            { x: 1550 / 2400, y: 710 / 1080, width: 220 / 2400, height: 20 / 1080, material: 'stone' },
           ],
           pigs: [
-            { x: 1150 / 1920, y: 920 / 1080, size: 'small' },
-            { x: 1350 / 1920, y: 920 / 1080, size: 'small' },
-            { x: 1250 / 1920, y: 810 / 1080, size: 'medium' }
+            { x: 1450 / 2400, y: 870 / 1080, size: 'small' },
+            { x: 1650 / 2400, y: 870 / 1080, size: 'small' },
+            { x: 1550 / 2400, y: 780 / 1080, size: 'medium' }
           ]
         },
         threeStarScore: 35000,
@@ -175,26 +196,26 @@ export class Level {
         oneStarScore: 18000
       },
 
-      // LEVEL 4 - Ice Palace
+      // LEVEL 4 - Ice Palace (FIXED: Ice blocks now more visible)
       {
         levelNumber: 4,
         birds: ['blue', 'blue', 'red', 'yellow', 'blue'],
         structure: {
           blocks: [
-            { x: 1100 / 1920, y: 950 / 1080, width: 20 / 1920, height: 180 / 1080, material: 'ice' },
-            { x: 1180 / 1920, y: 950 / 1080, width: 20 / 1920, height: 180 / 1080, material: 'ice' },
-            { x: 1320 / 1920, y: 950 / 1080, width: 20 / 1920, height: 180 / 1080, material: 'ice' },
-            { x: 1400 / 1920, y: 950 / 1080, width: 20 / 1920, height: 180 / 1080, material: 'ice' },
-            { x: 1140 / 1920, y: 860 / 1080, width: 100 / 1920, height: 15 / 1080, material: 'ice' },
-            { x: 1360 / 1920, y: 860 / 1080, width: 100 / 1920, height: 15 / 1080, material: 'ice' },
-            { x: 1250 / 1920, y: 810 / 1080, width: 240 / 1920, height: 15 / 1080, material: 'wood' },
-            { x: 1200 / 1920, y: 760 / 1080, width: 20 / 1920, height: 100 / 1080, material: 'ice' },
-            { x: 1300 / 1920, y: 760 / 1080, width: 20 / 1920, height: 100 / 1080, material: 'ice' },
+            { x: 1400 / 2400, y: 920 / 1080, width: 20 / 2400, height: 180 / 1080, material: 'ice' },
+            { x: 1480 / 2400, y: 920 / 1080, width: 20 / 2400, height: 180 / 1080, material: 'ice' },
+            { x: 1620 / 2400, y: 920 / 1080, width: 20 / 2400, height: 180 / 1080, material: 'ice' },
+            { x: 1700 / 2400, y: 920 / 1080, width: 20 / 2400, height: 180 / 1080, material: 'ice' },
+            { x: 1440 / 2400, y: 830 / 1080, width: 100 / 2400, height: 15 / 1080, material: 'ice' },
+            { x: 1660 / 2400, y: 830 / 1080, width: 100 / 2400, height: 15 / 1080, material: 'ice' },
+            { x: 1550 / 2400, y: 780 / 1080, width: 240 / 2400, height: 15 / 1080, material: 'wood' },
+            { x: 1500 / 2400, y: 730 / 1080, width: 20 / 2400, height: 100 / 1080, material: 'ice' },
+            { x: 1600 / 2400, y: 730 / 1080, width: 20 / 2400, height: 100 / 1080, material: 'ice' },
           ],
           pigs: [
-            { x: 1140 / 1920, y: 920 / 1080, size: 'small' },
-            { x: 1360 / 1920, y: 920 / 1080, size: 'small' },
-            { x: 1250 / 1920, y: 780 / 1080, size: 'medium' }
+            { x: 1440 / 2400, y: 870 / 1080, size: 'small' },
+            { x: 1660 / 2400, y: 870 / 1080, size: 'small' },
+            { x: 1550 / 2400, y: 750 / 1080, size: 'medium' }
           ]
         },
         threeStarScore: 32000,
@@ -208,21 +229,21 @@ export class Level {
         birds: ['red', 'yellow', 'black', 'blue', 'red'],
         structure: {
           blocks: [
-            { x: 1080 / 1920, y: 950 / 1080, width: 20 / 1920, height: 220 / 1080, material: 'stone' },
-            { x: 1180 / 1920, y: 950 / 1080, width: 20 / 1920, height: 220 / 1080, material: 'wood' },
-            { x: 1320 / 1920, y: 950 / 1080, width: 20 / 1920, height: 220 / 1080, material: 'wood' },
-            { x: 1420 / 1920, y: 950 / 1080, width: 20 / 1920, height: 220 / 1080, material: 'stone' },
-            { x: 1250 / 1920, y: 840 / 1080, width: 360 / 1920, height: 20 / 1080, material: 'stone' },
-            { x: 1150 / 1920, y: 780 / 1080, width: 20 / 1920, height: 120 / 1080, material: 'ice' },
-            { x: 1250 / 1920, y: 780 / 1080, width: 20 / 1920, height: 120 / 1080, material: 'ice' },
-            { x: 1350 / 1920, y: 780 / 1080, width: 20 / 1920, height: 120 / 1080, material: 'ice' },
-            { x: 1250 / 1920, y: 720 / 1080, width: 220 / 1920, height: 20 / 1080, material: 'wood' },
+            { x: 1380 / 2400, y: 920 / 1080, width: 20 / 2400, height: 220 / 1080, material: 'stone' },
+            { x: 1480 / 2400, y: 920 / 1080, width: 20 / 2400, height: 220 / 1080, material: 'wood' },
+            { x: 1620 / 2400, y: 920 / 1080, width: 20 / 2400, height: 220 / 1080, material: 'wood' },
+            { x: 1720 / 2400, y: 920 / 1080, width: 20 / 2400, height: 220 / 1080, material: 'stone' },
+            { x: 1550 / 2400, y: 810 / 1080, width: 360 / 2400, height: 20 / 1080, material: 'stone' },
+            { x: 1450 / 2400, y: 750 / 1080, width: 20 / 2400, height: 120 / 1080, material: 'ice' },
+            { x: 1550 / 2400, y: 750 / 1080, width: 20 / 2400, height: 120 / 1080, material: 'ice' },
+            { x: 1650 / 2400, y: 750 / 1080, width: 20 / 2400, height: 120 / 1080, material: 'ice' },
+            { x: 1550 / 2400, y: 690 / 1080, width: 220 / 2400, height: 20 / 1080, material: 'wood' },
           ],
           pigs: [
-            { x: 1130 / 1920, y: 920 / 1080, size: 'small' },
-            { x: 1370 / 1920, y: 920 / 1080, size: 'small' },
-            { x: 1250 / 1920, y: 760 / 1080, size: 'medium' },
-            { x: 1250 / 1920, y: 700 / 1080, size: 'large' }
+            { x: 1430 / 2400, y: 860 / 1080, size: 'small' },
+            { x: 1670 / 2400, y: 860 / 1080, size: 'small' },
+            { x: 1550 / 2400, y: 730 / 1080, size: 'medium' },
+            { x: 1550 / 2400, y: 670 / 1080, size: 'large' }
           ]
         },
         threeStarScore: 45000,
@@ -237,97 +258,92 @@ export class Level {
         structure: {
           blocks: [
             // Left tower
-            { x: 1050 / 1920, y: 950 / 1080, width: 25 / 1920, height: 200 / 1080, material: 'wood' },
-            { x: 1150 / 1920, y: 950 / 1080, width: 25 / 1920, height: 200 / 1080, material: 'wood' },
-            { x: 1100 / 1920, y: 850 / 1080, width: 120 / 1920, height: 20 / 1080, material: 'stone' },
-            { x: 1070 / 1920, y: 790 / 1080, width: 20 / 1920, height: 120 / 1080, material: 'ice' },
-            { x: 1130 / 1920, y: 790 / 1080, width: 20 / 1920, height: 120 / 1080, material: 'ice' },
-            { x: 1100 / 1920, y: 730 / 1080, width: 80 / 1920, height: 15 / 1080, material: 'wood' },
+            { x: 1400 / 2400, y: 900 / 1080, width: 25 / 2400, height: 180 / 1080, material: 'stone' },
+            { x: 1500 / 2400, y: 900 / 1080, width: 25 / 2400, height: 180 / 1080, material: 'stone' },
+            { x: 1450 / 2400, y: 810 / 1080, width: 120 / 2400, height: 20 / 1080, material: 'wood' },
+            { x: 1420 / 2400, y: 750 / 1080, width: 25 / 2400, height: 120 / 1080, material: 'ice' },
+            { x: 1480 / 2400, y: 750 / 1080, width: 25 / 2400, height: 120 / 1080, material: 'ice' },
             // Right tower
-            { x: 1350 / 1920, y: 950 / 1080, width: 25 / 1920, height: 200 / 1080, material: 'wood' },
-            { x: 1450 / 1920, y: 950 / 1080, width: 25 / 1920, height: 200 / 1080, material: 'wood' },
-            { x: 1400 / 1920, y: 850 / 1080, width: 120 / 1920, height: 20 / 1080, material: 'stone' },
-            { x: 1370 / 1920, y: 790 / 1080, width: 20 / 1920, height: 120 / 1080, material: 'ice' },
-            { x: 1430 / 1920, y: 790 / 1080, width: 20 / 1920, height: 120 / 1080, material: 'ice' },
-            { x: 1400 / 1920, y: 730 / 1080, width: 80 / 1920, height: 15 / 1080, material: 'wood' },
-            // Bridge
-            { x: 1250 / 1920, y: 850 / 1080, width: 220 / 1920, height: 15 / 1080, material: 'wood' },
+            { x: 1600 / 2400, y: 900 / 1080, width: 25 / 2400, height: 180 / 1080, material: 'stone' },
+            { x: 1700 / 2400, y: 900 / 1080, width: 25 / 2400, height: 180 / 1080, material: 'stone' },
+            { x: 1650 / 2400, y: 810 / 1080, width: 120 / 2400, height: 20 / 1080, material: 'wood' },
+            { x: 1620 / 2400, y: 750 / 1080, width: 25 / 2400, height: 120 / 1080, material: 'ice' },
+            { x: 1680 / 2400, y: 750 / 1080, width: 25 / 2400, height: 120 / 1080, material: 'ice' },
           ],
           pigs: [
-            { x: 1100 / 1920, y: 920 / 1080, size: 'medium' },
-            { x: 1400 / 1920, y: 920 / 1080, size: 'medium' },
-            { x: 1250 / 1920, y: 830 / 1080, size: 'large' },
-            { x: 1100 / 1920, y: 780 / 1080, size: 'small' },
-            { x: 1400 / 1920, y: 780 / 1080, size: 'small' }
+            { x: 1450 / 2400, y: 860 / 1080, size: 'small' },
+            { x: 1650 / 2400, y: 860 / 1080, size: 'small' },
+            { x: 1450 / 2400, y: 730 / 1080, size: 'medium' },
+            { x: 1650 / 2400, y: 730 / 1080, size: 'medium' }
           ]
         },
-        threeStarScore: 55000,
-        twoStarScore: 40000,
-        oneStarScore: 30000
+        threeStarScore: 38000,
+        twoStarScore: 28000,
+        oneStarScore: 20000
       },
 
-      // LEVEL 7 - The Stronghold
+      // LEVEL 7 - The Pyramid
       {
         levelNumber: 7,
         birds: ['red', 'blue', 'yellow', 'black', 'white', 'red'],
         structure: {
           blocks: [
-            // Outer walls
-            { x: 1000 / 1920, y: 950 / 1080, width: 30 / 1920, height: 250 / 1080, material: 'stone' },
-            { x: 1500 / 1920, y: 950 / 1080, width: 30 / 1920, height: 250 / 1080, material: 'stone' },
-            // Inner structure
-            { x: 1150 / 1920, y: 950 / 1080, width: 25 / 1920, height: 180 / 1080, material: 'wood' },
-            { x: 1250 / 1920, y: 950 / 1080, width: 25 / 1920, height: 180 / 1080, material: 'wood' },
-            { x: 1350 / 1920, y: 950 / 1080, width: 25 / 1920, height: 180 / 1080, material: 'wood' },
-            { x: 1250 / 1920, y: 860 / 1080, width: 250 / 1920, height: 25 / 1080, material: 'stone' },
+            // Base layer
+            { x: 1400 / 2400, y: 920 / 1080, width: 25 / 2400, height: 150 / 1080, material: 'stone' },
+            { x: 1470 / 2400, y: 920 / 1080, width: 25 / 2400, height: 150 / 1080, material: 'stone' },
+            { x: 1540 / 2400, y: 920 / 1080, width: 25 / 2400, height: 150 / 1080, material: 'stone' },
+            { x: 1610 / 2400, y: 920 / 1080, width: 25 / 2400, height: 150 / 1080, material: 'stone' },
+            { x: 1680 / 2400, y: 920 / 1080, width: 25 / 2400, height: 150 / 1080, material: 'stone' },
+            { x: 1505 / 2400, y: 845 / 1080, width: 320 / 2400, height: 20 / 1080, material: 'wood' },
+            // Middle layer
+            { x: 1450 / 2400, y: 800 / 1080, width: 25 / 2400, height: 120 / 1080, material: 'ice' },
+            { x: 1540 / 2400, y: 800 / 1080, width: 25 / 2400, height: 120 / 1080, material: 'ice' },
+            { x: 1630 / 2400, y: 800 / 1080, width: 25 / 2400, height: 120 / 1080, material: 'ice' },
+            { x: 1540 / 2400, y: 740 / 1080, width: 200 / 2400, height: 20 / 1080, material: 'wood' },
             // Top layer
-            { x: 1200 / 1920, y: 800 / 1080, width: 20 / 1920, height: 100 / 1080, material: 'ice' },
-            { x: 1300 / 1920, y: 800 / 1080, width: 20 / 1920, height: 100 / 1080, material: 'ice' },
-            { x: 1250 / 1920, y: 750 / 1080, width: 120 / 1920, height: 20 / 1080, material: 'stone' },
-            // Protective platforms
-            { x: 1050 / 1920, y: 880 / 1080, width: 80 / 1920, height: 15 / 1080, material: 'wood' },
-            { x: 1450 / 1920, y: 880 / 1080, width: 80 / 1920, height: 15 / 1080, material: 'wood' },
+            { x: 1500 / 2400, y: 700 / 1080, width: 25 / 2400, height: 80 / 1080, material: 'wood' },
+            { x: 1580 / 2400, y: 700 / 1080, width: 25 / 2400, height: 80 / 1080, material: 'wood' },
           ],
           pigs: [
-            { x: 1050 / 1920, y: 860 / 1080, size: 'small' },
-            { x: 1450 / 1920, y: 860 / 1080, size: 'small' },
-            { x: 1200 / 1920, y: 920 / 1080, size: 'medium' },
-            { x: 1300 / 1920, y: 920 / 1080, size: 'medium' },
-            { x: 1250 / 1920, y: 780 / 1080, size: 'large' }
+            { x: 1470 / 2400, y: 870 / 1080, size: 'small' },
+            { x: 1610 / 2400, y: 870 / 1080, size: 'small' },
+            { x: 1540 / 2400, y: 780 / 1080, size: 'medium' },
+            { x: 1540 / 2400, y: 680 / 1080, size: 'large' }
           ]
         },
-        threeStarScore: 65000,
-        twoStarScore: 48000,
-        oneStarScore: 35000
+        threeStarScore: 50000,
+        twoStarScore: 38000,
+        oneStarScore: 28000
       },
 
-      // LEVEL 8 - The Pyramid
+      // LEVEL 8 - The Ultimate Challenge
       {
         levelNumber: 8,
-        birds: ['yellow', 'yellow', 'black', 'white', 'red', 'blue'],
+        birds: ['red', 'blue', 'yellow', 'black', 'white', 'red', 'blue'],
         structure: {
           blocks: [
-            // Base layer
-            { x: 1100 / 1920, y: 950 / 1080, width: 25 / 1920, height: 120 / 1080, material: 'stone' },
-            { x: 1200 / 1920, y: 950 / 1080, width: 25 / 1920, height: 120 / 1080, material: 'stone' },
-            { x: 1300 / 1920, y: 950 / 1080, width: 25 / 1920, height: 120 / 1080, material: 'stone' },
-            { x: 1400 / 1920, y: 950 / 1080, width: 25 / 1920, height: 120 / 1080, material: 'stone' },
-            // Second layer
-            { x: 1150 / 1920, y: 870 / 1080, width: 20 / 1920, height: 100 / 1080, material: 'wood' },
-            { x: 1250 / 1920, y: 870 / 1080, width: 20 / 1920, height: 100 / 1080, material: 'wood' },
-            { x: 1350 / 1920, y: 870 / 1080, width: 20 / 1920, height: 100 / 1080, material: 'wood' },
-            // Third layer
-            { x: 1200 / 1920, y: 800 / 1080, width: 18 / 1920, height: 80 / 1080, material: 'ice' },
-            { x: 1300 / 1920, y: 800 / 1080, width: 18 / 1920, height: 80 / 1080, material: 'ice' },
-            // Top
-            { x: 1250 / 1920, y: 740 / 1080, width: 15 / 1920, height: 60 / 1080, material: 'ice' },
+            // Complex multi-level structure
+            { x: 1350 / 2400, y: 920 / 1080, width: 25 / 2400, height: 200 / 1080, material: 'stone' },
+            { x: 1450 / 2400, y: 920 / 1080, width: 25 / 2400, height: 200 / 1080, material: 'wood' },
+            { x: 1550 / 2400, y: 920 / 1080, width: 25 / 2400, height: 200 / 1080, material: 'ice' },
+            { x: 1650 / 2400, y: 920 / 1080, width: 25 / 2400, height: 200 / 1080, material: 'wood' },
+            { x: 1750 / 2400, y: 920 / 1080, width: 25 / 2400, height: 200 / 1080, material: 'stone' },
+            { x: 1550 / 2400, y: 820 / 1080, width: 420 / 2400, height: 20 / 1080, material: 'stone' },
+            { x: 1400 / 2400, y: 770 / 1080, width: 25 / 2400, height: 100 / 1080, material: 'ice' },
+            { x: 1500 / 2400, y: 770 / 1080, width: 25 / 2400, height: 100 / 1080, material: 'ice' },
+            { x: 1600 / 2400, y: 770 / 1080, width: 25 / 2400, height: 100 / 1080, material: 'ice' },
+            { x: 1700 / 2400, y: 770 / 1080, width: 25 / 2400, height: 100 / 1080, material: 'ice' },
+            { x: 1550 / 2400, y: 720 / 1080, width: 320 / 2400, height: 20 / 1080, material: 'wood' },
+            { x: 1500 / 2400, y: 680 / 1080, width: 15 / 2400, height: 80 / 1080, material: 'stone' },
+            { x: 1600 / 2400, y: 680 / 1080, width: 15 / 2400, height: 80 / 1080, material: 'stone' },
+            { x: 1550 / 2400, y: 640 / 1080, width: 120 / 2400, height: 15 / 1080, material: 'ice' },
           ],
           pigs: [
-            { x: 1150 / 1920, y: 920 / 1080, size: 'small' },
-            { x: 1350 / 1920, y: 920 / 1080, size: 'small' },
-            { x: 1200 / 1920, y: 840 / 1080, size: 'medium' },
-            { x: 1300 / 1920, y: 840 / 1080, size: 'medium' },
-            { x: 1250 / 1920, y: 720 / 1080, size: 'large' }
+            { x: 1400 / 2400, y: 870 / 1080, size: 'small' },
+            { x: 1700 / 2400, y: 870 / 1080, size: 'small' },
+            { x: 1500 / 2400, y: 790 / 1080, size: 'medium' },
+            { x: 1600 / 2400, y: 790 / 1080, size: 'medium' },
+            { x: 1550 / 2400, y: 660 / 1080, size: 'large' }
           ]
         },
         threeStarScore: 70000,
@@ -345,108 +361,95 @@ export class Level {
   }
 
   private generateProceduralLevel(levelNumber: number): LevelConfig {
-    const difficulty = levelNumber - 8; // Difficulty increases after level 8
+    const difficulty = levelNumber - 8;
     const numBirds = Math.min(5 + Math.floor(difficulty / 2), 8);
     const numPigs = Math.min(3 + Math.floor(difficulty / 2), 6);
 
-    // Generate birds with variety - ensure strategic mix
     const birds: BirdType[] = [];
     const birdTypes: BirdType[] = ['red', 'blue', 'yellow', 'black', 'white'];
     
-    // Start with at least one of each type for variety
     const minBirds = Math.min(numBirds, birdTypes.length);
     for (let i = 0; i < minBirds; i++) {
       birds.push(birdTypes[i]);
     }
     
-    // Fill remaining slots randomly
     for (let i = minBirds; i < numBirds; i++) {
       birds.push(birdTypes[Math.floor(Math.random() * birdTypes.length)]);
     }
     
-    // Shuffle for variety
     birds.sort(() => Math.random() - 0.5);
 
-    // Generate structure
     const blocks: BlockDef[] = [];
     const pigs: PigDef[] = [];
     const materials: BlockMaterial[] = ['wood', 'stone', 'ice'];
 
-    // Create towers with better positioning
     const numTowers = Math.min(2 + Math.floor(difficulty / 3), 3);
     const towerSpacing = 200;
-    const startX = 1100;
+    const startX = 1400; // Adjusted for new wider world
 
     for (let t = 0; t < numTowers; t++) {
       const baseX = startX + t * towerSpacing;
       const towerHeight = Math.min(3 + Math.floor(difficulty / 2), 5);
       
-      // Select material based on difficulty
       const towerMaterial = materials[Math.min(Math.floor(difficulty / 3), materials.length - 1)];
 
-      // Tower pillars
       for (let h = 0; h < towerHeight; h++) {
-        const yPos = 950 - h * 90;
+        const yPos = 920 - h * 90;
         
-        // Left pillar
         blocks.push({
-          x: baseX / 1920,
+          x: baseX / 2400,
           y: yPos / 1080,
-          width: 25 / 1920,
+          width: 25 / 2400,
           height: 120 / 1080,
           material: towerMaterial
         });
 
-        // Right pillar
         blocks.push({
-          x: (baseX + 100) / 1920,
+          x: (baseX + 100) / 2400,
           y: yPos / 1080,
-          width: 25 / 1920,
+          width: 25 / 2400,
           height: 120 / 1080,
           material: towerMaterial
         });
 
-        // Cross beam (lighter material)
         if (h < towerHeight - 1) {
           const beamMaterial = h % 2 === 0 ? 'wood' : 'ice';
           blocks.push({
-            x: (baseX + 50) / 1920,
+            x: (baseX + 50) / 2400,
             y: (yPos - 60) / 1080,
-            width: 120 / 1920,
+            width: 120 / 2400,
             height: 20 / 1080,
             material: beamMaterial
           });
         }
       }
 
-      // Place pigs strategically in towers
       if (t < numPigs) {
         const pigLevel = Math.floor(towerHeight / 2);
-        const pigY = 950 - pigLevel * 90;
+        const pigY = 920 - pigLevel * 90;
         
         const pigSizes: ('small' | 'medium' | 'large')[] = ['small', 'medium', 'large'];
         const pigSize = pigSizes[Math.min(Math.floor(difficulty / 3), 2)];
         
         pigs.push({
-          x: (baseX + 50) / 1920,
+          x: (baseX + 50) / 2400,
           y: pigY / 1080,
           size: pigSize
         });
       }
     }
 
-    // Add ground level pigs
+    // Add ground level pigs with safe Y position
     const remainingPigs = numPigs - numTowers;
     for (let i = 0; i < remainingPigs; i++) {
       const pigX = startX + 50 + (i * 80);
       pigs.push({
-        x: pigX / 1920,
-        y: 940 / 1080,
+        x: pigX / 2400,
+        y: 880 / 1080, // Safe position above ground
         size: i % 2 === 0 ? 'small' : 'medium'
       });
     }
 
-    // Calculate star scores based on difficulty
     const baseScore = 10000 + (levelNumber * 5000);
     return {
       levelNumber,
@@ -459,7 +462,6 @@ export class Level {
   }
 
   clear(): void {
-    // Clear blocks
     this.blocks.forEach(block => {
       if (block && block.destroy) {
         block.destroy();
@@ -467,7 +469,6 @@ export class Level {
     });
     this.blocks = [];
     
-    // Clear pigs
     this.pigs.forEach(pig => {
       if (pig && pig.destroy) {
         pig.destroy();
@@ -477,7 +478,6 @@ export class Level {
   }
 
   update(): void {
-    // Update blocks and award points
     this.blocks = this.blocks.filter(block => {
       if (!block) return false;
       
@@ -493,7 +493,6 @@ export class Level {
       return true;
     });
 
-    // Update pigs and award points
     this.pigs = this.pigs.filter(pig => {
       if (!pig) return false;
       
@@ -536,7 +535,6 @@ export class Level {
     return this.blocks;
   }
 
-  // Get star rating based on score
   getStarRating(score: number): number {
     const config = this.getLevelConfig(this.currentLevel);
     if (score >= config.threeStarScore) return 3;
@@ -545,7 +543,6 @@ export class Level {
     return 0;
   }
 
-  // Get required score for stars
   getStarThresholds(): { one: number, two: number, three: number } {
     const config = this.getLevelConfig(this.currentLevel);
     return {

@@ -86,7 +86,7 @@ export class Block {
           density: 0.0009,
           friction: 0.05,
           restitution: 0.8,
-          color: 0x87CEEB,
+          color: 0x4DB8E8, // Brighter, more visible cyan/blue color
           durability: 30
         };
       default:
@@ -105,26 +105,58 @@ export class Block {
     
     // Calculate damage tint (darker as health decreases)
     const healthPercent = this.health / this.maxHealth;
-    const darkenFactor = healthPercent * 0.6 + 0.4;
     
-    this.sprite.beginFill(baseColor, darkenFactor);
-    this.sprite.drawRect(-this.width / 2, -this.height / 2, this.width, this.height);
-    this.sprite.endFill();
-    
-    // Add texture lines
-    this.sprite.lineStyle(2, 0x000000, 0.2);
-    if (this.material === 'wood') {
-      // Wood grain
-      for (let i = 0; i < 3; i++) {
-        const y = -this.height / 2 + (this.height / 4) * (i + 1);
-        this.sprite.moveTo(-this.width / 2, y);
-        this.sprite.lineTo(this.width / 2, y);
+    // For ice blocks, use special rendering for better visibility
+    if (this.material === 'ice') {
+      // Draw bright ice base with better visibility
+      this.sprite.beginFill(0x8FDBF5, 0.9); // Very light blue, almost opaque
+      this.sprite.drawRect(-this.width / 2, -this.height / 2, this.width, this.height);
+      this.sprite.endFill();
+      
+      // Add darker blue tint based on health
+      const darknessFactor = healthPercent * 0.4 + 0.6;
+      this.sprite.beginFill(baseColor, darknessFactor * 0.7);
+      this.sprite.drawRect(-this.width / 2, -this.height / 2, this.width, this.height);
+      this.sprite.endFill();
+      
+      // Add strong border for ice blocks
+      this.sprite.lineStyle(3, 0x1E90FF, 0.9); // Bright blue border
+      this.sprite.drawRect(-this.width / 2, -this.height / 2, this.width, this.height);
+      
+      // Ice crystal pattern for better visibility
+      this.sprite.lineStyle(2, 0xFFFFFF, 0.6);
+      // Diagonal lines for ice crystal effect
+      this.sprite.moveTo(-this.width / 2, -this.height / 2);
+      this.sprite.lineTo(this.width / 2, this.height / 2);
+      this.sprite.moveTo(this.width / 2, -this.height / 2);
+      this.sprite.lineTo(-this.width / 2, this.height / 2);
+      // Center snowflake
+      this.sprite.moveTo(0, -this.height / 4);
+      this.sprite.lineTo(0, this.height / 4);
+      this.sprite.moveTo(-this.width / 4, 0);
+      this.sprite.lineTo(this.width / 4, 0);
+    } else {
+      // Normal rendering for wood and stone
+      const darkenFactor = healthPercent * 0.6 + 0.4;
+      this.sprite.beginFill(baseColor, darkenFactor);
+      this.sprite.drawRect(-this.width / 2, -this.height / 2, this.width, this.height);
+      this.sprite.endFill();
+      
+      // Add texture lines
+      this.sprite.lineStyle(2, 0x000000, 0.2);
+      if (this.material === 'wood') {
+        // Wood grain
+        for (let i = 0; i < 3; i++) {
+          const y = -this.height / 2 + (this.height / 4) * (i + 1);
+          this.sprite.moveTo(-this.width / 2, y);
+          this.sprite.lineTo(this.width / 2, y);
+        }
+      } else if (this.material === 'stone') {
+        // Stone cracks
+        this.sprite.moveTo(0, -this.height / 2);
+        this.sprite.lineTo(-this.width / 4, 0);
+        this.sprite.lineTo(this.width / 4, this.height / 2);
       }
-    } else if (this.material === 'stone') {
-      // Stone cracks
-      this.sprite.moveTo(0, -this.height / 2);
-      this.sprite.lineTo(-this.width / 4, 0);
-      this.sprite.lineTo(this.width / 4, this.height / 2);
     }
     
     // Show cracks when damaged
