@@ -4,6 +4,7 @@ import { Slingshot } from "./Slingshot";
 import { Level } from "./Level";
 import { Bird, type BirdType } from "./Bird";
 import { AudioManager } from "./AudioManager";
+import { UI } from "./UI";
 
 export class Game {
   private app: Application;
@@ -14,38 +15,45 @@ export class Game {
   private currentBird: Bird | null = null;
   private audioManager: AudioManager;
   private pixiContainer: Container;
+  private ui: UI;
 
-  // Virtual playable area (change these if you want a bigger world)
-  private baseWidth = 2400;
+  private score: number = 0;
+  private availableBirds: BirdType[] = [];
+  private birdsUsed: number = 0;
+  private isLevelComplete: boolean = false;
+  private isGameOver: boolean = false;
+
+  // Responsive viewport settings
+  private baseWidth = 1920;
   private baseHeight = 1080;
-
-  // Scaling clamps (tweak if you want different min/max zoom)
-  private minScale = 0.4; // don't let content become smaller than this
-  private maxScale = 1;    // never upscale beyond 1 (prevents "too big" on phones)
-
   private scale = 1;
+
+  // Game state check tracking
+  private gameStateCheckInterval: number | null = null;
+  private lastCheckTime: number = 0;
+  
+  // Ability triggering
+  private canActivateAbility: boolean = false;
+  private abilityActivationDelay: number = 300; // ms after launch
 
   constructor() {
     this.app = new Application();
     this.pixiContainer = new Container();
 
-    // Recommended world gravity (tweak as needed for feel)
     this.engine = Matter.Engine.create({
-      gravity: { x: 0, y: 0.5 } // sweet spot for arcade-style arcs
+      gravity: { x: 0, y: 0.5 }
     });
     this.world = this.engine.world;
 
     this.audioManager = new AudioManager();
     this.slingshot = new Slingshot(this);
-    // pass virtual world to Level so level uses same coords
     this.level = new Level(this, this.baseWidth, this.baseHeight);
+    this.ui = new UI(this, this.baseWidth, this.baseHeight);
   }
 
   async init(): Promise<void> {
-    // clamp device pixel ratio for performance
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    // PIXI v8 async init + resizeTo: window ensures canvas fills viewport
     await this.app.init({
       width: window.innerWidth,
       height: window.innerHeight,
@@ -55,32 +63,29 @@ export class Game {
       resizeTo: window
     });
 
-    // style canvas for consistent layout
     const canvas = this.app.canvas as HTMLCanvasElement;
-    canvas.style.touchAction = "none"; // prevents browser gestures interfering
+    canvas.style.touchAction = "none";
     canvas.style.display = "block";
     canvas.style.width = "100%";
     canvas.style.height = "100%";
     document.body.style.margin = "0";
+    document.body.style.overflow = "hidden";
     document.body.appendChild(canvas);
 
-    // stage setup
     this.app.stage.addChild(this.pixiContainer);
+    this.app.stage.addChild(this.ui.getContainer());
 
-    // initial viewport
     this.setupResponsiveViewport();
     window.addEventListener("resize", () => this.onResize());
-    window.addEventListener("orientationchange", () => this.onResize());
+    window.addEventListener("orientationchange", () => {
+      setTimeout(() => this.onResize(), 100);
+    });
 
-    // game loop
     this.app.ticker.add(() => this.update());
-
-    // input
     this.setupInputHandlers();
 
-    // load level & position slingshot relative to virtual world
     await this.level.load(1);
-    this.slingshot.setPosition(this.baseWidth * 0.08, this.baseHeight * 0.78); // normalized placement
+    this.slingshot.setPosition(this.baseWidth * 0.08, this.baseHeight * 0.78);
     this.spawnNextBird();
   }
 
@@ -88,40 +93,40 @@ export class Game {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
-    // 'contain' scaling: entire virtual area visible; preserves aspect ratio
-    const rawScale = Math.min(vw / this.baseWidth, vh / this.baseHeight);
-
-    // Clamp to prevent too small or (important) prevent upscaling > 1 which causes "too big" zoom
-    const clamped = Math.max(Math.min(rawScale, this.maxScale), this.minScale);
-
-    this.scale = clamped;
+    // Calculate scale to cover more screen - fit to height primarily
+    const scaleX = vw / this.baseWidth;
+    const scaleY = vh / this.baseHeight;
+    
+    // Use larger scale to fill more screen space
+    this.scale = Math.max(scaleX, scaleY * 0.95);
+    
     this.pixiContainer.scale.set(this.scale);
 
-    // center horizontally, anchor to bottom so ground & sling remain visible
-    const offsetX = (vw - this.baseWidth * this.scale) / 2;
-    const offsetY = vh - this.baseHeight * this.scale; // bottom aligned
+    // Center horizontally, align to bottom
+    const scaledWidth = this.baseWidth * this.scale;
+    const scaledHeight = this.baseHeight * this.scale;
+    
+    const offsetX = (vw - scaledWidth) / 2;
+    const offsetY = vh - scaledHeight;
 
     this.pixiContainer.position.set(offsetX, offsetY);
+    this.ui.updateScale(this.scale, vw, vh);
   }
 
   private onResize(): void {
-    // Ensure renderer matches CSS size, update DPR clamp if needed
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.app.renderer.resize(window.innerWidth, window.innerHeight);
     this.app.renderer.resolution = dpr;
     this.setupResponsiveViewport();
   }
 
-  // Robust client -> virtual world conversion (accounts for CSS size, DPR, and container offset)
   private screenToWorld(clientX: number, clientY: number) {
     const canvas = this.app.canvas as HTMLCanvasElement;
     const rect = canvas.getBoundingClientRect();
 
-    // convert client coords to canvas pixels
     const canvasX = (clientX - rect.left) * (this.app.renderer.width / rect.width);
     const canvasY = (clientY - rect.top) * (this.app.renderer.height / rect.height);
 
-    // convert canvas (renderer) pixels into virtual world coords
     const worldX = (canvasX - this.pixiContainer.position.x) / this.scale;
     const worldY = (canvasY - this.pixiContainer.position.y) / this.scale;
 
@@ -130,14 +135,33 @@ export class Game {
 
   private setupInputHandlers(): void {
     const canvas = this.app.canvas as HTMLCanvasElement;
+    
+    let isDraggingSlingshot = false;
 
-    // pointer events unify mouse/touch/stylus
     canvas.addEventListener(
       "pointerdown",
       (e: PointerEvent) => {
         if (!e.isPrimary) return;
+        e.preventDefault();
         const p = this.screenToWorld(e.clientX, e.clientY);
+        
+        // Check if clicking on bird for slingshot
+        if (this.currentBird && !this.currentBird.isLaunched) {
+          const dx = p.x - this.currentBird.body.position.x;
+          const dy = p.y - this.currentBird.body.position.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < Math.max(80, this.currentBird.getRadiusOut() * 2.5)) {
+            isDraggingSlingshot = true;
+          }
+        }
+        
         this.onPointerDown(p.x, p.y);
+        
+        // If not dragging slingshot, treat as ability activation
+        if (!isDraggingSlingshot) {
+          this.onAbilityActivate();
+        }
       },
       { passive: false }
     );
@@ -146,6 +170,7 @@ export class Game {
       "pointermove",
       (e: PointerEvent) => {
         if (!e.isPrimary) return;
+        e.preventDefault();
         const p = this.screenToWorld(e.clientX, e.clientY);
         this.onPointerMove(p.x, p.y);
       },
@@ -156,26 +181,23 @@ export class Game {
       "pointerup",
       (e: PointerEvent) => {
         if (!e.isPrimary) return;
+        e.preventDefault();
         const p = this.screenToWorld(e.clientX, e.clientY);
         this.onPointerUp(p.x, p.y);
+        isDraggingSlingshot = false;
       },
       { passive: false }
     );
-
-    // click/tap for ability activation (we still use client coords, ability logic checks speed)
-    canvas.addEventListener("click", (e: MouseEvent) => {
-      // convert to world if you need positions; we're using speed threshold so coords not needed
-      this.onAbilityActivate(e.clientX, e.clientY);
-    });
   }
 
   private onPointerDown(worldX: number, worldY: number): void {
+    if (this.isLevelComplete || this.isGameOver) return;
+    
     if (this.currentBird && !this.currentBird.isLaunched) {
       const dx = worldX - this.currentBird.body.position.x;
       const dy = worldY - this.currentBird.body.position.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      // bigger grab area on mobile helps usability
       if (dist < Math.max(80, this.currentBird.getRadiusOut() * 2.5)) {
         this.slingshot.startDrag(worldX, worldY);
         this.audioManager.play("slingshotStretch");
@@ -184,84 +206,238 @@ export class Game {
   }
 
   private onPointerMove(worldX: number, worldY: number): void {
-    if (this.slingshot.isDragging && this.currentBird) {
+    if (this.slingshot.isDragging && this.currentBird && !this.currentBird.isLaunched) {
       this.slingshot.updateDrag(worldX, worldY);
       this.currentBird.updatePosition(this.slingshot.dragX, this.slingshot.dragY);
     }
   }
 
   private onPointerUp(worldX: number, worldY: number): void {
-    if (this.slingshot.isDragging && this.currentBird) {
+    if (this.slingshot.isDragging && this.currentBird && !this.currentBird.isLaunched) {
       const force = this.slingshot.release();
-      // apply a launch multiplier tuned against virtual world size
-      const worldScaleFactor = this.baseWidth / 1920; // if you changed baseWidth, this preserves feel
+      const worldScaleFactor = this.baseWidth / 1920;
       const launchMultiplier = 0.6 * worldScaleFactor;
       this.launchBird(force.x * launchMultiplier, force.y * launchMultiplier);
       this.audioManager.play("birdLaunch");
     }
   }
 
-  private onAbilityActivate(_: number, __: number): void {
+  private onAbilityActivate(): void {
     if (!this.currentBird) return;
+    if (!this.canActivateAbility) return;
+    if (!this.currentBird.isLaunched) return;
+    if (this.currentBird.abilityUsed) return;
 
-    const v = this.currentBird.body.velocity;
-    const speed = Math.sqrt(v.x * v.x + v.y * v.y);
-
-    // require the bird to be moving in the "sweet spot" (not too fast, not fully stopped)
-    const minSpeed = 0.3;
-    const maxSpeed = 6; // tweak to make ability easier/harder to trigger
-    if (speed < minSpeed || speed > maxSpeed) return;
-
-    if (this.currentBird.isLaunched && !this.currentBird.abilityUsed) {
-      this.currentBird.activateAbility();
-    }
+    this.currentBird.activateAbility();
   }
 
   private launchBird(forceX: number, forceY: number): void {
     if (!this.currentBird) return;
 
     this.currentBird.launch(forceX, forceY);
-
-    // after a short delay we check settled state and spawn next bird
+    this.birdsUsed++;
+    this.ui.updateBirdCount(this.getRemainingBirds());
+    
+    this.canActivateAbility = false;
+    
     setTimeout(() => {
-      if (this.currentBird?.isSettled()) {
-        this.checkWinCondition();
-        this.spawnNextBird();
-      }
-    }, 3000);
+      this.canActivateAbility = true;
+    }, this.abilityActivationDelay);
+
+    if (this.gameStateCheckInterval !== null) {
+      clearInterval(this.gameStateCheckInterval);
+    }
+
+    this.lastCheckTime = Date.now();
+    this.gameStateCheckInterval = window.setInterval(() => {
+      this.checkGameState();
+    }, 500);
   }
 
   private spawnNextBird(): void {
-    const types: BirdType[] = ["red", "blue", "yellow", "black", "white"];
-    const random = types[Math.floor(Math.random() * types.length)];
+    if (this.isLevelComplete || this.isGameOver) return;
+    
+    const remainingBirds = this.getRemainingBirds();
+    if (remainingBirds <= 0) {
+      return;
+    }
 
-    this.currentBird = new Bird(random, this.slingshot.anchorX, this.slingshot.anchorY, this);
+    if (this.currentBird) {
+      this.currentBird.destroy();
+      this.currentBird = null;
+    }
+    
+    this.canActivateAbility = false;
+
+    const birdType = this.availableBirds[this.birdsUsed];
+    this.currentBird = new Bird(
+      birdType,
+      this.slingshot.anchorX,
+      this.slingshot.anchorY,
+      this
+    );
   }
 
-  private checkWinCondition(): void {
-    const pigs = this.level.getPigs();
-    const allDead = pigs.every((p) => p.isDestroyed);
+  private checkGameState(): void {
+    if (this.isLevelComplete || this.isGameOver) {
+      if (this.gameStateCheckInterval !== null) {
+        clearInterval(this.gameStateCheckInterval);
+        this.gameStateCheckInterval = null;
+      }
+      return;
+    }
 
-    if (allDead) {
-      this.audioManager.play("levelComplete");
-      setTimeout(() => {
-        this.level.load(this.level.currentLevel + 1);
-      }, 2000);
+    const pigs = this.level.getPigs();
+    const allPigsDead = pigs.length === 0 || pigs.every((p) => p.isDestroyed);
+
+    if (allPigsDead) {
+      this.handleLevelComplete();
+      return;
+    }
+
+    const birdSettled = this.currentBird?.isSettled() || false;
+    const remainingBirds = this.getRemainingBirds();
+
+    if (birdSettled) {
+      if (remainingBirds <= 0) {
+        this.handleGameOver();
+      } else {
+        this.spawnNextBird();
+      }
+    }
+
+    const timeSinceLaunch = Date.now() - this.lastCheckTime;
+    if (timeSinceLaunch > 15000) {
+      if (remainingBirds <= 0) {
+        this.handleGameOver();
+      } else {
+        this.spawnNextBird();
+      }
     }
   }
 
-  private update(): void {
-    Matter.Engine.update(this.engine, 1000 / 60);
-    this.level.update();
-    this.currentBird?.update();
-    this.slingshot.update();
+  private handleLevelComplete(): void {
+    if (this.isLevelComplete) return;
+    
+    this.isLevelComplete = true;
+    this.canActivateAbility = false;
+    
+    if (this.gameStateCheckInterval !== null) {
+      clearInterval(this.gameStateCheckInterval);
+      this.gameStateCheckInterval = null;
+    }
+    
+    const remainingBirds = this.getRemainingBirds();
+    const birdBonus = remainingBirds * 10000;
+    this.addScore(birdBonus);
+
+    const stars = this.level.getStarRating(this.score);
+    this.audioManager.play("levelComplete");
+    
+    setTimeout(() => {
+      this.ui.showLevelComplete(this.level.currentLevel, this.score, stars, birdBonus);
+    }, 500);
   }
 
-  // getters
+  private handleGameOver(): void {
+    if (this.isGameOver) return;
+    
+    this.isGameOver = true;
+    this.canActivateAbility = false;
+    
+    if (this.gameStateCheckInterval !== null) {
+      clearInterval(this.gameStateCheckInterval);
+      this.gameStateCheckInterval = null;
+    }
+    
+    const stars = this.level.getStarRating(this.score);
+    
+    setTimeout(() => {
+      this.ui.showGameOver(this.level.currentLevel, this.score, stars);
+    }, 500);
+  }
+
+  public restartLevel(): void {
+    this.resetGameState();
+    this.level.load(this.level.currentLevel);
+    this.spawnNextBird();
+  }
+
+  public nextLevel(): void {
+    this.resetGameState();
+    this.level.load(this.level.currentLevel + 1);
+    this.spawnNextBird();
+  }
+
+  public goToMenu(): void {
+    this.resetGameState();
+    this.level.load(1);
+    this.spawnNextBird();
+  }
+
+  private resetGameState(): void {
+    if (this.gameStateCheckInterval !== null) {
+      clearInterval(this.gameStateCheckInterval);
+      this.gameStateCheckInterval = null;
+    }
+    
+    this.score = 0;
+    this.birdsUsed = 0;
+    this.isLevelComplete = false;
+    this.isGameOver = false;
+    this.lastCheckTime = 0;
+    this.canActivateAbility = false;
+    
+    if (this.currentBird) {
+      this.currentBird.destroy();
+      this.currentBird = null;
+    }
+    
+    this.ui.updateScore(this.score);
+    this.ui.hideEndScreen();
+  }
+
+  public addScore(points: number): void {
+    this.score += points;
+    this.ui.updateScore(this.score);
+  }
+
+  public setAvailableBirds(birds: BirdType[]): void {
+    this.availableBirds = [...birds];
+    this.birdsUsed = 0;
+    this.ui.updateBirdCount(this.getRemainingBirds());
+    this.ui.updateBirdTypes(birds);
+    this.ui.updateLevel(this.level.currentLevel);
+  }
+
+  public getRemainingBirds(): number {
+    return Math.max(0, this.availableBirds.length - this.birdsUsed);
+  }
+
+  private update(): void {
+    if (!this.isLevelComplete && !this.isGameOver) {
+      Matter.Engine.update(this.engine, 1000 / 60);
+      this.level.update();
+      if (this.currentBird) {
+        this.currentBird.update();
+      }
+      this.slingshot.update();
+    } else {
+      Matter.Engine.update(this.engine, 1000 / 60);
+      this.level.update();
+      if (this.currentBird) {
+        this.currentBird.update();
+      }
+    }
+  }
+
   getApp() { return this.app; }
   getEngine() { return this.engine; }
   getWorld() { return this.world; }
   getContainer() { return this.pixiContainer; }
   getAudioManager() { return this.audioManager; }
   getSlingshot() { return this.slingshot; }
+  getScore() { return this.score; }
+  getLevel() { return this.level; }
+  getScale() { return this.scale; }
 }

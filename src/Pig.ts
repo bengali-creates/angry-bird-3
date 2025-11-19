@@ -10,7 +10,7 @@ export class Pig {
   public isDestroyed: boolean = false;
   
   private game: Game;
-  private size: PigSize;
+  public size: PigSize;
   private radius: number;
   private health: number;
   private maxHealth: number;

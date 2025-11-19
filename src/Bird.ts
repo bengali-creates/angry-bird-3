@@ -11,20 +11,24 @@ export class Bird {
   public isLaunched: boolean = false;
   public abilityUsed: boolean = false;
   public hasCollided: boolean = false;
+  public size: 'small' | 'medium' | 'large';
   
   private game: Game;
   private radius: number = 20;
   private lastVelocity: { x: number; y: number } = { x: 0, y: 0 };
   private settleTime: number = 0;
+  private collisionHandler: ((event: Matter.IEventCollision<Matter.Engine>) => void) | null = null;
+  private isDestroyed: boolean = false;
+  private isSplitBird: boolean = false; // Track if this is a split bird
 
-  constructor(type: BirdType, x: number, y: number, game: Game) {
+  constructor(type: BirdType, x: number, y: number, game: Game, isSplitBird: boolean = false) {
     this.type = type;
     this.game = game;
+    this.size = 'medium';
+    this.isSplitBird = isSplitBird;
     
-    // Adjust radius based on bird type
     this.radius = this.getRadius();
     
-    // Create physics body
     this.body = Matter.Bodies.circle(x, y, this.radius, {
       density: this.getDensity(),
       restitution: 0.29,
@@ -33,19 +37,17 @@ export class Bird {
     
     Matter.World.add(this.game.getWorld(), this.body);
     
-    // Create sprite
     this.sprite = new PIXI.Graphics();
     this.drawBird();
     
     this.game.getContainer().addChild(this.sprite);
     
-    // Start as kinematic (not affected by physics) until launched
     Matter.Body.setStatic(this.body, true);
     
-    // Listen for collisions
-    Matter.Events.on(this.game.getEngine(), 'collisionStart', (event) => {
+    this.collisionHandler = (event: Matter.IEventCollision<Matter.Engine>) => {
       this.handleCollision(event);
-    });
+    };
+    Matter.Events.on(this.game.getEngine(), 'collisionStart', this.collisionHandler);
   }
 
   private getRadius(): number {
@@ -61,12 +63,12 @@ export class Bird {
 
   private getDensity(): number {
     switch (this.type) {
-      case 'red': return 0.025;   // Strong and heavy
-      case 'blue': return 0.015;   // Light (splits into 3)
-      case 'yellow': return 0.02; // Medium (speed)
-      case 'black': return 0.04;   // Very heavy (explosive)
-      case 'white': return 0.03;   // Heavy (drops egg)
-      default: return 0.02;
+      case 'red': return 0.0025;
+      case 'blue': return 0.0015;
+      case 'yellow': return 0.002;
+      case 'black': return 0.004;
+      case 'white': return 0.003;
+      default: return 0.002;
     }
   }
 
@@ -86,71 +88,62 @@ export class Bird {
     
     const color = this.getColor();
     
-    // Draw body
     this.sprite.beginFill(color);
     this.sprite.drawCircle(0, 0, this.radius);
     this.sprite.endFill();
     
-    // Draw belly (lighter shade)
     const bellyColor = this.type === 'black' ? 0x444444 : 
                        this.type === 'white' ? 0xEEEEEE : 0xFFCCCC;
     this.sprite.beginFill(bellyColor);
     this.sprite.drawCircle(0, this.radius * 0.3, this.radius * 0.6);
     this.sprite.endFill();
     
-    // Draw eyes
     this.sprite.beginFill(0xFFFFFF);
     this.sprite.drawCircle(-this.radius * 0.35, -this.radius * 0.2, this.radius * 0.3);
     this.sprite.drawCircle(this.radius * 0.35, -this.radius * 0.2, this.radius * 0.3);
     this.sprite.endFill();
     
-    // Draw pupils
     this.sprite.beginFill(0x000000);
     this.sprite.drawCircle(-this.radius * 0.35, -this.radius * 0.15, this.radius * 0.15);
     this.sprite.drawCircle(this.radius * 0.35, -this.radius * 0.15, this.radius * 0.15);
     this.sprite.endFill();
     
-    // Draw beak
     this.sprite.beginFill(0xFFA500);
     this.sprite.moveTo(0, this.radius * 0.1);
     this.sprite.lineTo(-this.radius * 0.25, this.radius * 0.3);
     this.sprite.lineTo(this.radius * 0.25, this.radius * 0.3);
     this.sprite.endFill();
     
-    // Draw eyebrows (angry expression)
     this.sprite.lineStyle(this.radius * 0.12, 0x000000);
     this.sprite.moveTo(-this.radius * 0.6, -this.radius * 0.4);
     this.sprite.lineTo(-this.radius * 0.2, -this.radius * 0.35);
     this.sprite.moveTo(this.radius * 0.6, -this.radius * 0.4);
     this.sprite.lineTo(this.radius * 0.2, -this.radius * 0.35);
     
-    // Special features per bird
     if (this.type === 'black') {
-      // Draw fuse
       this.sprite.lineStyle(3, 0x8B4513);
       this.sprite.moveTo(0, -this.radius);
       this.sprite.lineTo(0, -this.radius * 1.3);
-      // Fuse tip
       this.sprite.beginFill(0xFF6600);
       this.sprite.drawCircle(0, -this.radius * 1.3, 4);
       this.sprite.endFill();
     }
-    
-    if (this.type === 'yellow') {
-      // Draw speed lines (when ability is active)
-      this.sprite.lineStyle(2, 0xFFAA00, 0);
-    }
   }
 
   private handleCollision(event: Matter.IEventCollision<Matter.Engine>): void {
+    if (this.isDestroyed) return;
+    
     event.pairs.forEach(pair => {
       if (pair.bodyA === this.body || pair.bodyB === this.body) {
         if (!this.hasCollided && this.isLaunched) {
           this.hasCollided = true;
           
-          // Black bird explodes on impact automatically
           if (this.type === 'black' && !this.abilityUsed) {
-            this.explodeAbility();
+            setTimeout(() => {
+              if (!this.isDestroyed) {
+                this.explodeAbility();
+              }
+            }, 50);
           }
         }
       }
@@ -158,16 +151,17 @@ export class Bird {
   }
 
   updatePosition(x: number, y: number): void {
-    if (!this.isLaunched) {
+    if (!this.isLaunched && !this.isDestroyed) {
       Matter.Body.setPosition(this.body, { x, y });
     }
   }
 
   launch(forceX: number, forceY: number): void {
+    if (this.isDestroyed) return;
+    
     this.isLaunched = true;
     Matter.Body.setStatic(this.body, false);
     
-    // Apply impulse for more realistic launch
     const mass = this.body.mass;
     Matter.Body.applyForce(this.body, this.body.position, {
       x: forceX * mass,
@@ -176,7 +170,7 @@ export class Bird {
   }
 
   activateAbility(): void {
-    // Don't allow ability after collision (except black bird which auto-triggers)
+    if (this.isDestroyed) return;
     if (this.hasCollided && this.type !== 'black') return;
     if (this.abilityUsed || !this.isLaunched) return;
     
@@ -185,36 +179,35 @@ export class Bird {
     
     switch (this.type) {
       case 'red':
-        this.redAbility(); // War cry - pushes nearby objects
+        this.redAbility();
         break;
       case 'blue':
-        this.splitAbility(); // Splits into 3
+        this.splitAbility();
         break;
       case 'yellow':
-        this.speedBoostAbility(); // Speed boost
+        this.speedBoostAbility();
         break;
       case 'black':
-        this.explodeAbility(); // Explodes
+        this.explodeAbility();
         break;
       case 'white':
-        this.eggBombAbility(); // Drops explosive egg
+        this.eggBombAbility();
         break;
     }
   }
 
   private redAbility(): void {
-    // RED BIRD: War cry - creates shockwave pushing nearby objects
+    if (this.isDestroyed) return;
+    
     const shockwaveRadius = 100;
     const shockwaveForce = 0.02;
     
-    // Visual effect - red shockwave ring
     const shockwave = new PIXI.Graphics();
     shockwave.lineStyle(4, 0xFF0000, 0.8);
     shockwave.drawCircle(0, 0, this.radius);
     shockwave.position.set(this.body.position.x, this.body.position.y);
     this.game.getContainer().addChild(shockwave);
     
-    // Animate shockwave expanding
     let radius = this.radius;
     const interval = setInterval(() => {
       radius += 15;
@@ -228,7 +221,6 @@ export class Bird {
       }
     }, 30);
     
-    // Apply force to nearby bodies
     const bodies = Matter.Composite.allBodies(this.game.getWorld());
     bodies.forEach(body => {
       if (body === this.body || body.isStatic) return;
@@ -250,46 +242,56 @@ export class Bird {
   }
 
   private splitAbility(): void {
-    // BLUE BIRD: Splits into 3 birds
+    if (this.isDestroyed) return;
+    
+    // FIXED: Blue bird now splits properly
     const velocity = this.body.velocity;
-    const pos = this.body.position;
+    const position = this.body.position;
     
-    // Split into 3 directions
-    const angles = [-0.3, 0, 0.3]; // Left, center, right
+    // Calculate current direction
+    const currentAngle = Math.atan2(velocity.y, velocity.x);
+    const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
     
-    angles.forEach(angleOffset => {
-      const bird = new Bird('blue', pos.x, pos.y, this.game);
-      bird.isLaunched = true;
-      bird.hasCollided = this.hasCollided; // Inherit collision state
-      Matter.Body.setStatic(bird.body, false);
+    // Create 2 additional birds at angles
+    const angles = [currentAngle - 0.4, currentAngle + 0.4]; // 23 degrees up and down
+    
+    angles.forEach(angle => {
+      // Create split bird with flag
+      const splitBird = new Bird('blue', position.x, position.y, this.game, true);
+      splitBird.isLaunched = true;
+      splitBird.hasCollided = false; // Split birds haven't collided yet
+      splitBird.abilityUsed = true; // Can't split again
       
-      const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
-      const currentAngle = Math.atan2(velocity.y, velocity.x);
-      const newAngle = currentAngle + angleOffset;
+      // Make it dynamic
+      Matter.Body.setStatic(splitBird.body, false);
       
-      Matter.Body.setVelocity(bird.body, {
-        x: Math.cos(newAngle) * speed,
-        y: Math.sin(newAngle) * speed
+      // Set velocity based on angle
+      Matter.Body.setVelocity(splitBird.body, {
+        x: Math.cos(angle) * speed * 0.9, // Slightly slower
+        y: Math.sin(angle) * speed * 0.9
       });
-      
-      bird.abilityUsed = true;
+    });
+    
+    // Maintain original bird's trajectory
+    Matter.Body.setVelocity(this.body, {
+      x: velocity.x * 0.9,
+      y: velocity.y * 0.9
     });
   }
 
   private speedBoostAbility(): void {
-    // YELLOW BIRD: Accelerates forward dramatically
+    if (this.isDestroyed) return;
+    
     const velocity = this.body.velocity;
     const speedMultiplier = 3.0;
     
     Matter.Body.setVelocity(this.body, {
       x: velocity.x * speedMultiplier,
-      y: velocity.y * 0.5 // Reduce vertical component for more horizontal speed
+      y: velocity.y * 0.5
     });
     
-    // Visual effect: speed lines and color change
     this.sprite.tint = 0xFFFF00;
     
-    // Draw speed lines
     const speedLines = new PIXI.Graphics();
     speedLines.lineStyle(3, 0xFFAA00, 0.8);
     for (let i = 0; i < 5; i++) {
@@ -303,32 +305,34 @@ export class Bird {
     this.game.getContainer().addChild(speedLines);
     
     setTimeout(() => {
-      this.sprite.tint = 0xFFFFFF;
+      if (!this.isDestroyed) {
+        this.sprite.tint = 0xFFFFFF;
+      }
       this.game.getContainer().removeChild(speedLines);
     }, 300);
   }
 
   private explodeAbility(): void {
-    // BLACK BIRD: Massive explosion
+    if (this.isDestroyed) return;
+    
     const explosionRadius = 200;
     const explosionForce = 0.08;
     
-    // Visual explosion effect
+    const explosionPos = { x: this.body.position.x, y: this.body.position.y };
+    
     const explosion = new PIXI.Graphics();
     explosion.beginFill(0xFF3300, 0.7);
     explosion.drawCircle(0, 0, explosionRadius);
     explosion.endFill();
-    explosion.position.set(this.body.position.x, this.body.position.y);
+    explosion.position.set(explosionPos.x, explosionPos.y);
     this.game.getContainer().addChild(explosion);
     
-    // Add fire ring
     const fireRing = new PIXI.Graphics();
     fireRing.lineStyle(8, 0xFF6600, 0.9);
     fireRing.drawCircle(0, 0, explosionRadius * 0.7);
-    fireRing.position.set(this.body.position.x, this.body.position.y);
+    fireRing.position.set(explosionPos.x, explosionPos.y);
     this.game.getContainer().addChild(fireRing);
     
-    // Animate explosion
     let scale = 0;
     const interval = setInterval(() => {
       scale += 0.2;
@@ -344,13 +348,12 @@ export class Bird {
       }
     }, 30);
     
-    // Apply force to nearby bodies
     const bodies = Matter.Composite.allBodies(this.game.getWorld());
     bodies.forEach(body => {
       if (body === this.body || body.isStatic) return;
       
-      const dx = body.position.x - this.body.position.x;
-      const dy = body.position.y - this.body.position.y;
+      const dx = body.position.x - explosionPos.x;
+      const dy = body.position.y - explosionPos.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
       if (distance < explosionRadius && distance > 0) {
@@ -366,11 +369,11 @@ export class Bird {
   }
 
   private eggBombAbility(): void {
-    // WHITE BIRD: Drops explosive egg bomb and flies upward
+    if (this.isDestroyed) return;
+    
     const pos = this.body.position;
     const velocity = this.body.velocity;
     
-    // Create egg bomb
     const eggRadius = 15;
     const eggBody = Matter.Bodies.circle(pos.x, pos.y + this.radius, eggRadius, {
       density: 0.003,
@@ -380,7 +383,6 @@ export class Bird {
     
     Matter.World.add(this.game.getWorld(), eggBody);
     
-    // Egg graphic
     const eggSprite = new PIXI.Graphics();
     eggSprite.beginFill(0xFFFFFF);
     eggSprite.drawEllipse(0, 0, eggRadius, eggRadius * 1.2);
@@ -390,28 +392,28 @@ export class Bird {
     eggSprite.endFill();
     this.game.getContainer().addChild(eggSprite);
     
-    // Egg inherits horizontal velocity, drops down
     Matter.Body.setVelocity(eggBody, {
       x: velocity.x * 0.5,
-      y: 5 // Drop down
+      y: 5
     });
     
-    // White bird flies upward
     Matter.Body.setVelocity(this.body, {
       x: velocity.x,
-      y: -15 // Fly up
+      y: -15
     });
     
-    // Egg explodes on impact
     let eggExploded = false;
-    Matter.Events.on(this.game.getEngine(), 'collisionStart', (event) => {
+    const eggCollisionHandler = (event: Matter.IEventCollision<Matter.Engine>) => {
       if (eggExploded) return;
       
       event.pairs.forEach(pair => {
         if (pair.bodyA === eggBody || pair.bodyB === eggBody) {
           eggExploded = true;
           
-          // Explosion effect
+          Matter.Events.off(this.game.getEngine(), 'collisionStart', eggCollisionHandler);
+          
+          const explosionPos = { x: eggBody.position.x, y: eggBody.position.y };
+          
           const explosionRadius = 120;
           const explosionForce = 0.05;
           
@@ -419,7 +421,7 @@ export class Bird {
           explosion.beginFill(0xFF6600, 0.6);
           explosion.drawCircle(0, 0, explosionRadius);
           explosion.endFill();
-          explosion.position.set(eggBody.position.x, eggBody.position.y);
+          explosion.position.set(explosionPos.x, explosionPos.y);
           this.game.getContainer().addChild(explosion);
           
           let scale = 0;
@@ -434,13 +436,12 @@ export class Bird {
             }
           }, 30);
           
-          // Apply force
           const bodies = Matter.Composite.allBodies(this.game.getWorld());
           bodies.forEach(body => {
             if (body === eggBody || body.isStatic) return;
             
-            const dx = body.position.x - eggBody.position.x;
-            const dy = body.position.y - eggBody.position.y;
+            const dx = body.position.x - explosionPos.x;
+            const dy = body.position.y - explosionPos.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             
             if (distance < explosionRadius && distance > 0) {
@@ -454,14 +455,14 @@ export class Bird {
             }
           });
           
-          // Remove egg
           Matter.World.remove(this.game.getWorld(), eggBody);
           this.game.getContainer().removeChild(eggSprite);
         }
       });
-    });
+    };
     
-    // Update egg sprite position
+    Matter.Events.on(this.game.getEngine(), 'collisionStart', eggCollisionHandler);
+    
     const updateEgg = () => {
       if (!eggExploded && eggBody) {
         eggSprite.position.set(eggBody.position.x, eggBody.position.y);
@@ -473,11 +474,11 @@ export class Bird {
   }
 
   update(): void {
-    // Sync sprite position with physics body
+    if (this.isDestroyed) return;
+    
     this.sprite.position.set(this.body.position.x, this.body.position.y);
     this.sprite.rotation = this.body.angle;
     
-    // Check if bird has settled
     if (this.isLaunched) {
       const velocity = this.body.velocity;
       const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
@@ -493,14 +494,33 @@ export class Bird {
   }
 
   isSettled(): boolean {
-    return this.settleTime > 60; // Settled for 1 second at 60 FPS
+    return this.settleTime > 60;
   }
+
   getRadiusOut(): number {
     return this.radius;
   }
 
   destroy(): void {
-    Matter.World.remove(this.game.getWorld(), this.body);
-    this.game.getContainer().removeChild(this.sprite);
+    if (this.isDestroyed) return;
+    
+    this.isDestroyed = true;
+    
+    if (this.collisionHandler) {
+      Matter.Events.off(this.game.getEngine(), 'collisionStart', this.collisionHandler);
+      this.collisionHandler = null;
+    }
+    
+    try {
+      Matter.World.remove(this.game.getWorld(), this.body);
+    } catch (e) {
+      // Already removed
+    }
+    
+    try {
+      this.game.getContainer().removeChild(this.sprite);
+    } catch (e) {
+      // Already removed
+    }
   }
 }
