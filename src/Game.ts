@@ -26,16 +26,13 @@ export class Game {
   private isGameOver: boolean = false;
   private isPlaying: boolean = false;
 
-  // IMPROVED: Much wider world for proper Angry Birds spacing
-  private baseWidth = 3000; // Increased from 2400 for MUCH more space
+  private baseWidth = 3000;
   private baseHeight = 1080;
   private scale = 1;
 
-  // Game state check tracking
   private gameStateCheckInterval: number | null = null;
   private lastCheckTime: number = 0;
   
-  // Ability triggering
   private canActivateAbility: boolean = false;
   private abilityActivationDelay: number = 300;
 
@@ -58,13 +55,15 @@ export class Game {
   async init(): Promise<void> {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
+    // IMPROVED: Transparent background to show level background
     await this.app.init({
       width: window.innerWidth,
       height: window.innerHeight,
-      background: 0x87CEEB,
+      backgroundAlpha: 0,  // Transparent - level draws background
       resolution: dpr,
       autoDensity: true,
-      resizeTo: window
+      resizeTo: window,
+      antialias: true
     });
 
     const canvas = this.app.canvas as HTMLCanvasElement;
@@ -72,8 +71,16 @@ export class Game {
     canvas.style.display = "block";
     canvas.style.width = "100%";
     canvas.style.height = "100%";
+    canvas.style.position = "fixed";
+    canvas.style.top = "0";
+    canvas.style.left = "0";
+    
     document.body.style.margin = "0";
     document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.width = "100%";
+    document.body.style.height = "100%";
+    document.body.style.backgroundColor = "#87CEEB";  // Fallback sky color
     document.body.appendChild(canvas);
 
     this.app.stage.addChild(this.pixiContainer);
@@ -81,15 +88,19 @@ export class Game {
     this.app.stage.addChild(this.menuManager.getContainer());
 
     this.setupResponsiveViewport();
+    
     window.addEventListener("resize", () => this.onResize());
     window.addEventListener("orientationchange", () => {
+      setTimeout(() => this.onResize(), 150);
+    });
+    
+    window.visualViewport?.addEventListener("resize", () => {
       setTimeout(() => this.onResize(), 100);
     });
 
     this.app.ticker.add(() => this.update());
     this.setupInputHandlers();
 
-    // IMPROVED: Slingshot positioned for optimal spacing
     this.slingshot.setPosition(this.baseWidth * 0.10, this.baseHeight * 0.78);
     
     this.menuManager.showMainMenu();
@@ -101,21 +112,29 @@ export class Game {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
-    // IMPROVED: Better responsive scaling for all devices
     const scaleX = vw / this.baseWidth;
     const scaleY = vh / this.baseHeight;
     
-    // Ensure we scale to fit the screen properly
-    this.scale = Math.max(scaleX, scaleY * 0.92);
+    const isMobile = vw < 768;
+    const isPortrait = vh > vw;
+    
+    if (isMobile && isPortrait) {
+      this.scale = scaleX;
+    } else if (isMobile && !isPortrait) {
+      this.scale = Math.min(scaleX, scaleY);
+    } else {
+      this.scale = Math.min(scaleX, scaleY * 0.95);
+    }
     
     this.pixiContainer.scale.set(this.scale);
 
-    // Center horizontally, align to bottom
     const scaledWidth = this.baseWidth * this.scale;
     const scaledHeight = this.baseHeight * this.scale;
     
     const offsetX = Math.max(0, (vw - scaledWidth) / 2);
-    const offsetY = Math.max(0, vh - scaledHeight);
+    const offsetY = isMobile && isPortrait ? 
+      Math.max(0, (vh - scaledHeight) / 2) :
+      Math.max(0, vh - scaledHeight);
 
     this.pixiContainer.position.set(offsetX, offsetY);
     this.ui.updateScale(this.scale, vw, vh);
@@ -161,7 +180,9 @@ export class Game {
           const dy = p.y - this.currentBird.body.position.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           
-          if (dist < Math.max(80, this.currentBird.getRadiusOut() * 2.5)) {
+          const touchRadius = Math.max(100, this.currentBird.getRadiusOut() * 3);
+          
+          if (dist < touchRadius) {
             isDraggingSlingshot = true;
           }
         }
@@ -209,7 +230,9 @@ export class Game {
       const dy = worldY - this.currentBird.body.position.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < Math.max(80, this.currentBird.getRadiusOut() * 2.5)) {
+      const touchRadius = Math.max(100, this.currentBird.getRadiusOut() * 3);
+      
+      if (dist < touchRadius) {
         this.slingshot.startDrag(worldX, worldY);
         this.audioManager.play("slingshotStretch");
       }
@@ -266,7 +289,7 @@ export class Game {
   }
 
   private spawnNextBird(): void {
-    if (this.isLevelComplete || this.isGameOver) return;
+     if (this.isLevelComplete || this.isGameOver) return;
     
     const remainingBirds = this.getRemainingBirds();
     if (remainingBirds <= 0) {
