@@ -5,163 +5,135 @@ export type SoundEffect =
   | 'blockHit'
   | 'blockDestroy'
   | 'pigDestroy'
-  | 'levelComplete';
+  | 'levelComplete'
+  | 'bgm';  // <--- 1. ADDED THIS
 
 export class AudioManager {
-  private sounds: Map<SoundEffect, AudioBuffer | null> = new Map();
-  private audioContext: AudioContext | null = null;
+  private buffers: Map<SoundEffect, AudioBuffer> = new Map();
+  private context: AudioContext;
+  private masterGain: GainNode;
+  private musicGain: GainNode; // <--- 2. New volume control just for music
+  private bgmSource: AudioBufferSourceNode | null = null; // <--- 3. Track current music to stop/loop it
   private enabled: boolean = true;
 
   constructor() {
-    // Initialize Web Audio API context
-    try {
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    } catch (e) {
-      console.warn('Web Audio API not supported', e);
-    }
+    this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
     
-    // Initialize sound placeholders
-    this.initializeSounds();
+    // Master Volume (Global)
+    this.masterGain = this.context.createGain();
+    this.masterGain.gain.value = 0.5; 
+    this.masterGain.connect(this.context.destination);
+
+    // Music Volume (Background only)
+    // usually we want background music quieter than sound effects
+    this.musicGain = this.context.createGain();
+    this.musicGain.gain.value = 0.4; 
+    this.musicGain.connect(this.masterGain);
   }
 
-  private initializeSounds(): void {
-    // Placeholder: In production, these would load actual audio files
-    const soundEffects: SoundEffect[] = [
-      'slingshotStretch',
-      'birdLaunch',
-      'abilityActivate',
-      'blockHit',
-      'blockDestroy',
-      'pigDestroy',
-      'levelComplete'
-    ];
-    
-    soundEffects.forEach(effect => {
-      this.sounds.set(effect, null);
+  async loadAssets(): Promise<void> {
+    const soundFiles: Record<SoundEffect, string> = {
+      'slingshotStretch': '/assets/sounds/stretch.mp3',
+      'birdLaunch':       '/assets/sounds/launch.mp3',
+      'abilityActivate':  '/assets/sounds/ability.mp3',
+      'blockHit':         '/assets/sounds/hit.mp3',
+      'blockDestroy':     '/assets/sounds/wood_destroy.mp3',
+      'pigDestroy':       '/assets/sounds/pig_destroy.mp3',
+      'levelComplete':    '/assets/sounds/win.mp3',
+      'bgm':              '/assets/sounds/bgm.mp3' // <--- 4. Add your music file path here
+    };
+
+    const promises = Object.entries(soundFiles).map(async ([key, url]) => {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+           throw new Error(`HTTP error ${response.status} for ${url}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+        this.buffers.set(key as SoundEffect, audioBuffer);
+        console.log(`Audio loaded: ${key}`);
+      } catch (error) {
+        console.warn(`Using fallback synth for: ${key} (File not found)`);
+      }
     });
+
+    await Promise.all(promises);
   }
 
-  play(soundEffect: SoundEffect): void {
-    if (!this.enabled || !this.audioContext) return;
-    
-    // For now, generate simple procedural sounds
-    // In production, this would play pre-loaded audio files
-    this.playProceduralSound(soundEffect);
+  /**
+   * Specialized method for Background Music
+   * Handles looping and stopping previous tracks.
+   */
+  playMusic(effect: SoundEffect): void { 
+    console.log(`Attempting to play music: ${effect}`);
+  console.log(`Audio Context State: ${this.context.state}`); 
+    if (!this.enabled) return;
+   
+
+    if (this.context.state === 'suspended') {
+      this.context.resume();
+    }
+
+    // Stop currently playing music if any
+    if (this.bgmSource) {
+      this.bgmSource.stop();
+      this.bgmSource = null;
+    }
+
+    const buffer = this.buffers.get(effect);
+
+    if (buffer) {
+      this.bgmSource = this.context.createBufferSource();
+      this.bgmSource.buffer = buffer;
+      this.bgmSource.loop = true; // <--- 5. This makes it repeat forever
+      this.bgmSource.connect(this.musicGain); // Connect to Music volume, not Master directly
+      this.bgmSource.start(0);
+    } else {
+      console.warn(`Music track '${effect}' not found.`);
+    }
+  }
+
+  stopMusic(): void {
+    if (this.bgmSource) {
+        this.bgmSource.stop();
+        this.bgmSource = null;
+    }
+  }
+
+  // Existing SFX play method
+  play(effect: SoundEffect): void {
+    if (!this.enabled) return;
+    if (this.context.state === 'suspended') {
+      this.context.resume();
+    }
+
+    const buffer = this.buffers.get(effect);
+    if (buffer) {
+      const source = this.context.createBufferSource();
+      source.buffer = buffer;
+      source.connect(this.masterGain); // SFX go directly to Master (louder)
+      source.start(0);
+    } else {
+      this.playProceduralSound(effect);
+    }
   }
 
   private playProceduralSound(soundEffect: SoundEffect): void {
-    if (!this.audioContext) return;
-    
-    const ctx = this.audioContext;
-    const now = ctx.currentTime;
-    
-    // Create oscillator for simple sound effects
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    
-    // Configure based on sound effect
-    switch (soundEffect) {
-      case 'slingshotStretch':
-        oscillator.frequency.setValueAtTime(200, now);
-        oscillator.frequency.exponentialRampToValueAtTime(100, now + 0.1);
-        gainNode.gain.setValueAtTime(0.1, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-        oscillator.start(now);
-        oscillator.stop(now + 0.1);
-        break;
-        
-      case 'birdLaunch':
-        oscillator.frequency.setValueAtTime(150, now);
-        oscillator.frequency.exponentialRampToValueAtTime(300, now + 0.15);
-        gainNode.gain.setValueAtTime(0.2, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-        oscillator.start(now);
-        oscillator.stop(now + 0.15);
-        break;
-        
-      case 'abilityActivate':
-        oscillator.frequency.setValueAtTime(400, now);
-        oscillator.frequency.exponentialRampToValueAtTime(800, now + 0.1);
-        gainNode.gain.setValueAtTime(0.15, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-        oscillator.start(now);
-        oscillator.stop(now + 0.1);
-        break;
-        
-      case 'blockHit':
-        oscillator.type = 'square';
-        oscillator.frequency.setValueAtTime(80, now);
-        oscillator.frequency.exponentialRampToValueAtTime(40, now + 0.08);
-        gainNode.gain.setValueAtTime(0.15, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
-        oscillator.start(now);
-        oscillator.stop(now + 0.08);
-        break;
-        
-      case 'blockDestroy':
-        oscillator.type = 'sawtooth';
-        oscillator.frequency.setValueAtTime(200, now);
-        oscillator.frequency.exponentialRampToValueAtTime(50, now + 0.2);
-        gainNode.gain.setValueAtTime(0.2, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-        oscillator.start(now);
-        oscillator.stop(now + 0.2);
-        break;
-        
-      case 'pigDestroy':
-        oscillator.frequency.setValueAtTime(300, now);
-        oscillator.frequency.exponentialRampToValueAtTime(100, now + 0.25);
-        gainNode.gain.setValueAtTime(0.25, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-        oscillator.start(now);
-        oscillator.stop(now + 0.25);
-        break;
-        
-      case 'levelComplete':
-        oscillator.frequency.setValueAtTime(523, now);
-        oscillator.frequency.setValueAtTime(659, now + 0.15);
-        oscillator.frequency.setValueAtTime(784, now + 0.3);
-        gainNode.gain.setValueAtTime(0.2, now);
-        gainNode.gain.setValueAtTime(0.2, now + 0.3);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
-        oscillator.start(now);
-        oscillator.stop(now + 0.5);
-        break;
-    }
+    // ... (Keep your existing switch statement here for backups) ...
+    // You don't need to add a case for 'bgm' here unless you want a generated beep loop
   }
 
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
-  }
-
-  isEnabled(): boolean {
-    return this.enabled;
-  }
-
-  // Method to load actual audio files (for production)
-  async loadSound(soundEffect: SoundEffect, url: string): Promise<void> {
-    if (!this.audioContext) return;
-    
-    try {
-      const response = await fetch(url);
-      const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-      this.sounds.set(soundEffect, audioBuffer);
-    } catch (error) {
-      console.error(`Failed to load sound: ${soundEffect}`, error);
+    if (enabled) {
+        if(this.context.state === 'suspended') this.context.resume();
+        // If we re-enable, you might want to restart music, 
+        // but usually just unmuting the context is enough.
+    } else {
+        this.stopMusic();
     }
   }
-
-  // Method to play loaded audio buffer
-  private playBuffer(buffer: AudioBuffer): void {
-    if (!this.audioContext) return;
-    
-    const source = this.audioContext.createBufferSource();
-    source.buffer = buffer;
-    source.connect(this.audioContext.destination);
-    source.start();
-  }
+  
+  isEnabled(): boolean { return this.enabled; }
 }

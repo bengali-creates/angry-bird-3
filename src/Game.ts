@@ -25,7 +25,7 @@ export class Game {
   private isLevelComplete: boolean = false;
   private isGameOver: boolean = false;
   private isPlaying: boolean = false;
-
+ private musicStarted: boolean = false;
   private baseWidth = 3000;
   private baseHeight = 1080;
   private scale = 1;
@@ -82,6 +82,11 @@ export class Game {
     document.body.style.height = "100%";
     document.body.style.backgroundColor = "#87CEEB";  // Fallback sky color
     document.body.appendChild(canvas);
+
+    await this.audioManager.loadAssets();
+
+    // 2. Start the music!
+    this.audioManager.playMusic('bgm');
 
     this.app.stage.addChild(this.pixiContainer);
     this.app.stage.addChild(this.ui.getContainer());
@@ -164,6 +169,25 @@ export class Game {
     const canvas = this.app.canvas as HTMLCanvasElement;
     
     let isDraggingSlingshot = false;
+    canvas.addEventListener(
+    "pointerdown",
+    (e: PointerEvent) => {
+      if (!e.isPrimary) return;
+
+      // === ADD THIS BLOCK ===
+      if (!this.musicStarted) {
+        this.musicStarted = true;
+        this.audioManager.setEnabled(true); // Wakes up the audio engine
+        this.audioManager.playMusic('bgm'); // Starts the music safely
+      }
+      
+
+      e.preventDefault();
+      
+      // ... rest of your existing pointerdown code ...
+    },
+    { passive: false }
+  );
 
     canvas.addEventListener(
       "pointerdown",
