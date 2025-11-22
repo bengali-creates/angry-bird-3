@@ -8,7 +8,7 @@ export class MenuManager {
   private container: PIXI.Container;
   private currentState: MenuState = 'main';
   
-  // Level progress data (saved in localStorage)
+  // Level progress data
   private levelProgress: { [level: number]: { completed: boolean; stars: number; highScore: number } } = {};
   private maxUnlockedLevel: number = 1;
   
@@ -52,7 +52,6 @@ export class MenuManager {
     this.levelProgress[level].stars = Math.max(this.levelProgress[level].stars, stars);
     this.levelProgress[level].highScore = Math.max(this.levelProgress[level].highScore, score);
     
-    // Unlock next level
     if (level === this.maxUnlockedLevel) {
       this.maxUnlockedLevel = level + 1;
     }
@@ -68,16 +67,16 @@ export class MenuManager {
     return level <= this.maxUnlockedLevel;
   }
   
-  public getMaxUnlockedLevel(): number {
-    return this.maxUnlockedLevel;
-  }
-  
   public showMainMenu(): void {
     this.currentState = 'main';
     this.container.removeChildren();
     
     const vw = window.innerWidth;
     const vh = window.innerHeight;
+    const isPortrait = vh > vw;
+    
+    // Use the smaller dimension to scale UI elements
+    const minDim = Math.min(vw, vh);
     
     // Background
     const bg = new PIXI.Graphics();
@@ -86,14 +85,19 @@ export class MenuManager {
     bg.endFill();
     this.container.addChild(bg);
     
-    // Title
-    const titleSize = Math.min(120, vw * 0.15);
+    // Responsive Title
+    // In portrait, we can afford slightly larger text relative to width
+    const titleScale = isPortrait ? 0.12 : 0.08;
+    const titleSize = minDim * 0.15; // Adaptive size
+    
     const title = new PIXI.Text('ANGRY BIRDS', {
       fontFamily: 'Arial',
       fontSize: titleSize,
       fontWeight: 'bold',
       fill: 0xFF0000,
-      stroke: { color: 0x000000, width: Math.max(8, titleSize / 15) }
+      stroke: { color: 0x000000, width: titleSize * 0.05 },
+      // dropShadow: true,
+      // dropShadowDistance: 5
     });
     title.anchor.set(0.5);
     title.x = vw / 2;
@@ -101,28 +105,29 @@ export class MenuManager {
     this.container.addChild(title);
     
     // Subtitle
-    const subtitleSize = Math.min(40, vw * 0.05);
+    const subtitleSize = titleSize * 0.4;
     const subtitle = new PIXI.Text('Clone Edition', {
       fontFamily: 'Arial',
       fontSize: subtitleSize,
       fontStyle: 'italic',
       fill: 0xFFFFFF,
-      stroke: { color: 0x000000, width: Math.max(3, subtitleSize / 13) }
+      stroke: { color: 0x000000, width: subtitleSize * 0.05 }
     });
     subtitle.anchor.set(0.5);
     subtitle.x = vw / 2;
     subtitle.y = vh * 0.35;
     this.container.addChild(subtitle);
     
-    // Play Button
-    const buttonWidth = Math.min(400, vw * 0.6);
-    const buttonHeight = buttonWidth * 0.25;
-    this.createMainButton('PLAY', vw / 2, vh * 0.55, buttonWidth, buttonHeight, () => {
+    // Play Button - Responsive
+    const btnW = Math.min(300, vw * 0.5);
+    const btnH = btnW * 0.35;
+    
+    this.createMainButton('PLAY', vw / 2, vh * 0.55, btnW, btnH, () => {
       this.showLevelSelect();
     });
     
     // Credits
-    const creditsSize = Math.min(24, vw * 0.03);
+    const creditsSize = Math.max(12, minDim * 0.03);
     const credits = new PIXI.Text('Created with PixiJS and Matter.js', {
       fontFamily: 'Arial',
       fontSize: creditsSize,
@@ -140,6 +145,7 @@ export class MenuManager {
     
     const vw = window.innerWidth;
     const vh = window.innerHeight;
+    const minDim = Math.min(vw, vh);
     
     // Background
     const bg = new PIXI.Graphics();
@@ -149,46 +155,58 @@ export class MenuManager {
     this.container.addChild(bg);
     
     // Title
-    const titleSize = Math.min(60, vw * 0.08);
+    const titleSize = minDim * 0.08;
     const title = new PIXI.Text('SELECT LEVEL', {
       fontFamily: 'Arial',
       fontSize: titleSize,
       fontWeight: 'bold',
       fill: 0xFFD700,
-      stroke: { color: 0x000000, width: Math.max(5, titleSize / 12) }
+      stroke: { color: 0x000000, width: titleSize * 0.05 }
     });
     title.anchor.set(0.5);
     title.x = vw / 2;
-    title.y = vh * 0.12;
+    title.y = vh * 0.1;
     this.container.addChild(title);
     
-    // Back button
-    const backBtnSize = Math.min(150, vw * 0.25);
-    this.createSmallButton('< BACK', backBtnSize * 0.6, vh * 0.12, backBtnSize, backBtnSize * 0.4, () => {
+    // Back button - Top Left
+    const backBtnW = minDim * 0.15;
+    const backBtnH = backBtnW * 0.5;
+    this.createSmallButton('< BACK', 20 + backBtnW/2, 20 + backBtnH/2, backBtnW, backBtnH, () => {
       this.showMainMenu();
     });
     
-    // Level grid
+    // Level Grid Logic
     const totalLevels = this.game.getLevel().getTotalLevels();
-    const cols = Math.min(4, Math.floor(vw / 180));
-    const rows = Math.ceil(totalLevels / cols);
     
-    const gridWidth = cols * 160;
-    const gridHeight = rows * 160;
-    const startX = (vw - gridWidth) / 2 + 80;
-    const startY = Math.max(vh * 0.25, (vh - gridHeight) / 2);
+    // Determine grid size based on screen width
+    const btnSize = Math.min(100, vw * 0.18); // Buttons aren't too big on desktop, not too small on mobile
+    const gap = 20;
+    
+    // Calculate how many columns fit
+    const availableWidth = vw * 0.9;
+    const cols = Math.floor(availableWidth / (btnSize + gap));
+    const actualCols = Math.min(cols, 4); // Max 4 columns for aesthetic
+    
+    const rows = Math.ceil(totalLevels / actualCols);
+    
+    const gridWidth = (actualCols * btnSize) + ((actualCols - 1) * gap);
+    const gridHeight = (rows * btnSize) + ((rows - 1) * gap);
+    
+    const startX = (vw - gridWidth) / 2 + btnSize / 2;
+    const startY = (vh * 0.25) + (btnSize / 2);
     
     for (let i = 1; i <= totalLevels; i++) {
-      const col = (i - 1) % cols;
-      const row = Math.floor((i - 1) / cols);
-      const x = startX + col * 160;
-      const y = startY + row * 160;
+      const col = (i - 1) % actualCols;
+      const row = Math.floor((i - 1) / actualCols);
       
-      this.createLevelButton(i, x, y);
+      const x = startX + col * (btnSize + gap);
+      const y = startY + row * (btnSize + gap);
+      
+      this.createLevelButton(i, x, y, btnSize);
     }
   }
   
-  private createLevelButton(level: number, x: number, y: number): void {
+  private createLevelButton(level: number, x: number, y: number, size: number): void {
     const button = new PIXI.Container();
     button.x = x;
     button.y = y;
@@ -197,21 +215,17 @@ export class MenuManager {
     const progress = this.getLevelProgress(level);
     
     // Button background
-    const size = 120;
     const bg = new PIXI.Graphics();
     
     if (isUnlocked) {
-      if (progress && progress.completed) {
-        bg.beginFill(0x4CAF50); // Green for completed
-      } else {
-        bg.beginFill(0x2196F3); // Blue for unlocked
-      }
+      if (progress && progress.completed) bg.beginFill(0x4CAF50); // Green
+      else bg.beginFill(0x2196F3); // Blue
     } else {
-      bg.beginFill(0x757575); // Gray for locked
+      bg.beginFill(0x757575); // Gray
     }
     
-    bg.lineStyle(4, 0x000000);
-    bg.drawRoundedRect(-size / 2, -size / 2, size, size, 10);
+    bg.lineStyle(Math.max(2, size * 0.03), 0x000000);
+    bg.drawRoundedRect(-size / 2, -size / 2, size, size, size * 0.15);
     bg.endFill();
     button.addChild(bg);
     
@@ -222,62 +236,39 @@ export class MenuManager {
       // Level number
       const levelText = new PIXI.Text(`${level}`, {
         fontFamily: 'Arial',
-        fontSize: 48,
+        fontSize: size * 0.4,
         fontWeight: 'bold',
         fill: 0xFFFFFF,
-        stroke: { color: 0x000000, width: 4 }
+        stroke: { color: 0x000000, width: size * 0.03 }
       });
       levelText.anchor.set(0.5);
-      levelText.y = -10;
+      levelText.y = -size * 0.1;
       button.addChild(levelText);
       
       // Stars
       if (progress && progress.stars > 0) {
         const starsContainer = new PIXI.Container();
-        starsContainer.y = 30;
+        starsContainer.y = size * 0.25;
+        
+        const starSize = size * 0.25;
         
         for (let i = 0; i < 3; i++) {
-          const star = this.createSmallStar(i < progress.stars, 12);
-          star.x = -30 + i * 30;
+          const star = this.createSmallStar(i < progress.stars, starSize / 2);
+          star.x = (i - 1) * (starSize);
           starsContainer.addChild(star);
         }
         
         button.addChild(starsContainer);
       }
       
-      // Hover effect
-      button.on('pointerover', () => {
-        bg.clear();
-        if (progress && progress.completed) {
-          bg.beginFill(0x66BB6A); // Lighter green
-        } else {
-          bg.beginFill(0x42A5F5); // Lighter blue
-        }
-        bg.lineStyle(4, 0x000000);
-        bg.drawRoundedRect(-size / 2, -size / 2, size, size, 10);
-        bg.endFill();
-      });
+      // Click
+      button.on('pointerdown', () => { this.startLevel(level); });
       
-      button.on('pointerout', () => {
-        bg.clear();
-        if (progress && progress.completed) {
-          bg.beginFill(0x4CAF50);
-        } else {
-          bg.beginFill(0x2196F3);
-        }
-        bg.lineStyle(4, 0x000000);
-        bg.drawRoundedRect(-size / 2, -size / 2, size, size, 10);
-        bg.endFill();
-      });
-      
-      button.on('pointerdown', () => {
-        this.startLevel(level);
-      });
     } else {
-      // Lock icon for locked levels
+      // Lock icon
       const lockText = new PIXI.Text('🔒', {
         fontFamily: 'Arial',
-        fontSize: 48
+        fontSize: size * 0.4
       });
       lockText.anchor.set(0.5);
       button.addChild(lockText);
@@ -286,11 +277,10 @@ export class MenuManager {
     this.container.addChild(button);
   }
   
-  private createSmallStar(filled: boolean, size: number): PIXI.Graphics {
+  private createSmallStar(filled: boolean, radius: number): PIXI.Graphics {
     const star = new PIXI.Graphics();
     const points = 5;
-    const outerRadius = size;
-    const innerRadius = size * 0.45;
+    const innerRadius = radius * 0.45;
 
     if (filled) {
       star.beginFill(0xFFD700);
@@ -300,23 +290,15 @@ export class MenuManager {
     }
 
     for (let i = 0; i < points * 2; i++) {
-      const radius = i % 2 === 0 ? outerRadius : innerRadius;
+      const r = i % 2 === 0 ? radius : innerRadius;
       const angle = (i * Math.PI) / points - Math.PI / 2;
-      const x = Math.cos(angle) * radius;
-      const y = Math.sin(angle) * radius;
-
-      if (i === 0) {
-        star.moveTo(x, y);
-      } else {
-        star.lineTo(x, y);
-      }
+      const x = Math.cos(angle) * r;
+      const y = Math.sin(angle) * r;
+      if (i === 0) star.moveTo(x, y);
+      else star.lineTo(x, y);
     }
     star.closePath();
-
-    if (filled) {
-      star.endFill();
-    }
-
+    if (filled) star.endFill();
     return star;
   }
   
@@ -329,53 +311,33 @@ export class MenuManager {
 
     const bg = new PIXI.Graphics();
     bg.beginFill(0x4CAF50);
-    bg.lineStyle(5, 0x2E7D32);
+    bg.lineStyle(4, 0x2E7D32);
     bg.drawRoundedRect(-width / 2, -height / 2, width, height, 15);
     bg.endFill();
     button.addChild(bg);
 
-    const fontSize = Math.min(60, width * 0.18);
+    const fontSize = Math.min(60, height * 0.6);
     const buttonText = new PIXI.Text(text, {
       fontFamily: 'Arial',
       fontSize: fontSize,
       fontWeight: 'bold',
       fill: 0xFFFFFF,
-      stroke: { color: 0x000000, width: Math.max(4, fontSize / 15) }
+      stroke: { color: 0x000000, width: 4 }
     });
     buttonText.anchor.set(0.5);
     button.addChild(buttonText);
 
-    button.on('pointerover', () => {
-      bg.clear();
-      bg.beginFill(0x66BB6A);
-      bg.lineStyle(5, 0x2E7D32);
-      bg.drawRoundedRect(-width / 2, -height / 2, width, height, 15);
-      bg.endFill();
-    });
-
-    button.on('pointerout', () => {
-      bg.clear();
-      bg.beginFill(0x4CAF50);
-      bg.lineStyle(5, 0x2E7D32);
-      bg.drawRoundedRect(-width / 2, -height / 2, width, height, 15);
-      bg.endFill();
-    });
-
     button.on('pointerdown', () => {
-      bg.clear();
-      bg.beginFill(0x388E3C);
-      bg.lineStyle(5, 0x2E7D32);
-      bg.drawRoundedRect(-width / 2, -height / 2, width, height, 15);
-      bg.endFill();
+      bg.tint = 0xCCCCCC; // Press feedback
     });
 
     button.on('pointerup', () => {
-      bg.clear();
-      bg.beginFill(0x4CAF50);
-      bg.lineStyle(5, 0x2E7D32);
-      bg.drawRoundedRect(-width / 2, -height / 2, width, height, 15);
-      bg.endFill();
+      bg.tint = 0xFFFFFF;
       onClick();
+    });
+    
+    button.on('pointerupoutside', () => {
+      bg.tint = 0xFFFFFF;
     });
 
     this.container.addChild(button);
@@ -390,39 +352,30 @@ export class MenuManager {
 
     const bg = new PIXI.Graphics();
     bg.beginFill(0xFF9800);
-    bg.lineStyle(3, 0xE65100);
+    bg.lineStyle(2, 0xE65100);
     bg.drawRoundedRect(-width / 2, -height / 2, width, height, 8);
     bg.endFill();
     button.addChild(bg);
 
-    const fontSize = Math.min(24, width * 0.15);
+    const fontSize = Math.min(24, height * 0.6);
     const buttonText = new PIXI.Text(text, {
       fontFamily: 'Arial',
       fontSize: fontSize,
       fontWeight: 'bold',
       fill: 0xFFFFFF,
-      stroke: { color: 0x000000, width: Math.max(2, fontSize / 12) }
+      stroke: { color: 0x000000, width: 2 }
     });
     buttonText.anchor.set(0.5);
     button.addChild(buttonText);
-
-    button.on('pointerover', () => {
-      bg.clear();
-      bg.beginFill(0xFFB74D);
-      bg.lineStyle(3, 0xE65100);
-      bg.drawRoundedRect(-width / 2, -height / 2, width, height, 8);
-      bg.endFill();
+    
+    button.on('pointerdown', () => {
+        bg.tint = 0xCCCCCC;
     });
 
-    button.on('pointerout', () => {
-      bg.clear();
-      bg.beginFill(0xFF9800);
-      bg.lineStyle(3, 0xE65100);
-      bg.drawRoundedRect(-width / 2, -height / 2, width, height, 8);
-      bg.endFill();
+    button.on('pointerup', () => {
+        bg.tint = 0xFFFFFF;
+        onClick();
     });
-
-    button.on('pointerup', onClick);
 
     this.container.addChild(button);
   }
@@ -433,19 +386,8 @@ export class MenuManager {
     this.game.startLevel(level);
   }
   
-  public show(): void {
-    this.container.visible = true;
-  }
-  
-  public hide(): void {
-    this.container.visible = false;
-  }
-  
-  public getContainer(): PIXI.Container {
-    return this.container;
-  }
-  
-  public getCurrentState(): MenuState {
-    return this.currentState;
-  }
+  public show(): void { this.container.visible = true; }
+  public hide(): void { this.container.visible = false; }
+  public getContainer(): PIXI.Container { return this.container; }
+  public getCurrentState(): MenuState { return this.currentState; }
 }
