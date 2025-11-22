@@ -108,7 +108,6 @@ export class Game {
     this.app.ticker.add(() => this.update());
     this.setupInputHandlers();
 
-    // FIXED: Reverted position to the left (0.12) so distance to pigs is larger
     this.slingshot.setPosition(this.baseWidth * 0.12, this.baseHeight * 0.78);
     
     this.menuManager.showMainMenu();
@@ -266,7 +265,6 @@ export class Game {
     this.canActivateAbility = false;
     setTimeout(() => { this.canActivateAbility = true; }, this.abilityActivationDelay);
 
-    // Start monitoring game state (collisions, level end) ONLY after launch
     if (this.gameStateCheckInterval !== null) {
       clearInterval(this.gameStateCheckInterval);
     }
@@ -277,8 +275,6 @@ export class Game {
   private spawnNextBird(): void {
     if (this.isLevelComplete || this.isGameOver) return;
     
-    // FIXED: STOP checking game state while the user is aiming the new bird
-    // This prevents the 15s timeout from triggering repeatedly and cycling all birds
     if (this.gameStateCheckInterval !== null) {
       clearInterval(this.gameStateCheckInterval);
       this.gameStateCheckInterval = null;
@@ -290,13 +286,10 @@ export class Game {
     this.canActivateAbility = false;
 
     if (this.birdQueue.length > 0) {
-      // Remove from queue and promote to active
       const nextBird = this.birdQueue.shift(); 
       if (nextBird) {
           this.currentBird = nextBird;
           
-          // FIXED: Directly assign the collision filter object instead of using Matter.Body.set
-          // This bypasses potential issues with property getters/setters in Matter.js body update logic
           this.currentBird.body.collisionFilter.group = 0;
           this.currentBird.body.collisionFilter.category = 1;
           this.currentBird.body.collisionFilter.mask = 0xFFFFFFFF;
@@ -310,13 +303,11 @@ export class Game {
           this.currentBird.update();
       }
     } else if (this.birdsUsed < this.availableBirds.length) {
-       // Fallback
        const birdType = this.availableBirds[this.birdsUsed];
        const resting = this.slingshot.getRestingPosition();
        this.currentBird = new Bird(birdType, resting.x, resting.y, this);
     }
 
-    // Shift visual queue forward
     this.birdQueue.forEach((bird, index) => {
         const targetX = this.slingshot.anchorX - 100 - (index * 60);
         Matter.Body.setPosition(bird.body, { x: targetX, y: bird.body.position.y });
@@ -341,22 +332,26 @@ export class Game {
     }
 
     const birdSettled = this.currentBird?.isSettled() || false;
-    const hasBirdsLeft = this.birdQueue.length > 0 || this.currentBird !== null;
+    const waitingBirdsCount = this.birdQueue.length;
 
     if (birdSettled) {
-      if (!hasBirdsLeft && this.birdsUsed >= this.availableBirds.length) {
+      // FIXED LOGIC: Check if we have any birds waiting in the queue.
+      // If queue is empty AND we used all available birds, then it is game over.
+      // (Note: this.birdsUsed counts the current bird, so we check if that equals total)
+      if (waitingBirdsCount === 0 && this.birdsUsed >= this.availableBirds.length) {
         this.handleGameOver();
       } else {
         this.spawnNextBird();
       }
-    }
-
-    const timeSinceLaunch = Date.now() - this.lastCheckTime;
-    if (timeSinceLaunch > 15000) {
-      if (!hasBirdsLeft && this.birdsUsed >= this.availableBirds.length) {
-        this.handleGameOver();
-      } else {
-        this.spawnNextBird();
+    } else {
+      // Fallback timeout check
+      const timeSinceLaunch = Date.now() - this.lastCheckTime;
+      if (timeSinceLaunch > 15000) {
+        if (waitingBirdsCount === 0 && this.birdsUsed >= this.availableBirds.length) {
+          this.handleGameOver();
+        } else {
+          this.spawnNextBird();
+        }
       }
     }
   }
@@ -434,7 +429,6 @@ export class Game {
       const resting = this.slingshot.getRestingPosition();
       this.currentBird = new Bird(firstBirdType, resting.x, resting.y, this);
       
-      // FIXED: Lowered the spawn point so birds sit on the ground (Height - 118px)
       const groundY = this.baseHeight - 118; 
       
       for(let i = 1; i < this.availableBirds.length; i++) {
@@ -442,11 +436,7 @@ export class Game {
           const waitX = this.slingshot.anchorX - 100 - ((i-1) * 60);
           
           const waitingBird = new Bird(birdType, waitX, groundY, this);
-          
-          // FIXED: Directly update collisionFilter properties for safety
-          waitingBird.body.collisionFilter.group = -1;
-          waitingBird.body.collisionFilter.category = 0;
-          waitingBird.body.collisionFilter.mask = 0;
+          waitingBird.body.collisionFilter = { group: -1, category: 0, mask: 0 };
           
           this.birdQueue.push(waitingBird);
       }

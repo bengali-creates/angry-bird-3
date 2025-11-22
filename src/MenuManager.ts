@@ -69,6 +69,7 @@ export class MenuManager {
   
   public showMainMenu(): void {
     this.currentState = 'main';
+    this.show(); // FIXED: Ensure container is visible when returning to main menu
     this.container.removeChildren();
     
     const vw = window.innerWidth;
@@ -86,9 +87,8 @@ export class MenuManager {
     this.container.addChild(bg);
     
     // Responsive Title
-    // In portrait, we can afford slightly larger text relative to width
     const titleScale = isPortrait ? 0.12 : 0.08;
-    const titleSize = minDim * 0.15; // Adaptive size
+    const titleSize = minDim * 0.15; 
     
     const title = new PIXI.Text('ANGRY BIRDS', {
       fontFamily: 'Arial',
@@ -118,7 +118,7 @@ export class MenuManager {
     subtitle.y = vh * 0.35;
     this.container.addChild(subtitle);
     
-    // Play Button - Responsive
+    // Play Button
     const btnW = Math.min(300, vw * 0.5);
     const btnH = btnW * 0.35;
     
@@ -141,6 +141,7 @@ export class MenuManager {
   
   public showLevelSelect(): void {
     this.currentState = 'levelSelect';
+    this.show(); // FIXED: Ensure container is visible when returning to level select
     this.container.removeChildren();
     
     const vw = window.innerWidth;
@@ -177,20 +178,16 @@ export class MenuManager {
     
     // Level Grid Logic
     const totalLevels = this.game.getLevel().getTotalLevels();
-    
-    // Determine grid size based on screen width
-    const btnSize = Math.min(100, vw * 0.18); // Buttons aren't too big on desktop, not too small on mobile
+    const btnSize = Math.min(100, vw * 0.18); 
     const gap = 20;
     
-    // Calculate how many columns fit
     const availableWidth = vw * 0.9;
     const cols = Math.floor(availableWidth / (btnSize + gap));
-    const actualCols = Math.min(cols, 4); // Max 4 columns for aesthetic
+    const actualCols = Math.min(cols, 4); 
     
     const rows = Math.ceil(totalLevels / actualCols);
     
     const gridWidth = (actualCols * btnSize) + ((actualCols - 1) * gap);
-    const gridHeight = (rows * btnSize) + ((rows - 1) * gap);
     
     const startX = (vw - gridWidth) / 2 + btnSize / 2;
     const startY = (vh * 0.25) + (btnSize / 2);
@@ -249,23 +246,18 @@ export class MenuManager {
       if (progress && progress.stars > 0) {
         const starsContainer = new PIXI.Container();
         starsContainer.y = size * 0.25;
-        
         const starSize = size * 0.25;
-        
         for (let i = 0; i < 3; i++) {
           const star = this.createSmallStar(i < progress.stars, starSize / 2);
           star.x = (i - 1) * (starSize);
           starsContainer.addChild(star);
         }
-        
         button.addChild(starsContainer);
       }
       
-      // Click
       button.on('pointerdown', () => { this.startLevel(level); });
       
     } else {
-      // Lock icon
       const lockText = new PIXI.Text('🔒', {
         fontFamily: 'Arial',
         fontSize: size * 0.4
@@ -281,14 +273,12 @@ export class MenuManager {
     const star = new PIXI.Graphics();
     const points = 5;
     const innerRadius = radius * 0.45;
-
     if (filled) {
       star.beginFill(0xFFD700);
       star.lineStyle(1, 0xFF8C00);
     } else {
       star.lineStyle(1, 0x666666);
     }
-
     for (let i = 0; i < points * 2; i++) {
       const r = i % 2 === 0 ? radius : innerRadius;
       const angle = (i * Math.PI) / points - Math.PI / 2;
