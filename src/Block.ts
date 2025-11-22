@@ -23,6 +23,9 @@ export class Block {
   private health: number;
   private maxHealth: number;
   private lastImpactTime: number = 0;
+  
+  // FIXED: Store reference to the collision handler so we can remove it later
+  private collisionHandler: ((event: Matter.IEventCollision<Matter.Engine>) => void) | null = null;
 
   constructor(
     x: number,
@@ -57,10 +60,11 @@ export class Block {
     this.updateSprite(props.color);
     this.game.getContainer().addChild(this.sprite);
     
-    // Listen for collisions
-    Matter.Events.on(this.game.getEngine(), 'collisionStart', (event) => {
+    // FIXED: Store the bound function so we can remove the listener in destroy()
+    this.collisionHandler = (event: Matter.IEventCollision<Matter.Engine>) => {
       this.handleCollision(event);
-    });
+    };
+    Matter.Events.on(this.game.getEngine(), 'collisionStart', this.collisionHandler);
   }
 
   private getMaterialProperties(): MaterialProperties {
@@ -222,6 +226,12 @@ export class Block {
   }
 
   destroy(): void {
+    // FIXED: Clean up the event listener to prevent memory leaks and game freezing
+    if (this.collisionHandler) {
+      Matter.Events.off(this.game.getEngine(), 'collisionStart', this.collisionHandler);
+      this.collisionHandler = null;
+    }
+
     Matter.World.remove(this.game.getWorld(), this.body);
     this.game.getContainer().removeChild(this.sprite);
   }

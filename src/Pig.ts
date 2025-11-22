@@ -16,6 +16,9 @@ export class Pig {
   private maxHealth: number;
   private spawnTime: number;
   private lastDamageTime: number = 0;
+  
+  // FIXED: Store collision handler reference
+  private collisionHandler: ((event: Matter.IEventCollision<Matter.Engine>) => void) | null = null;
 
   constructor(x: number, y: number, size: PigSize, game: Game) {
     this.game = game;
@@ -43,9 +46,11 @@ export class Pig {
     this.updateSprite();
     this.game.getContainer().addChild(this.sprite);
     
-    Matter.Events.on(this.game.getEngine(), 'collisionStart', (event) => {
+    // FIXED: Store listener for proper cleanup
+    this.collisionHandler = (event: Matter.IEventCollision<Matter.Engine>) => {
       this.handleCollision(event);
-    });
+    };
+    Matter.Events.on(this.game.getEngine(), 'collisionStart', this.collisionHandler);
     
     setTimeout(() => {
       if (this.body) {
@@ -186,6 +191,12 @@ export class Pig {
   }
 
   destroy(): void {
+    // FIXED: Remove the collision listener
+    if (this.collisionHandler) {
+      Matter.Events.off(this.game.getEngine(), 'collisionStart', this.collisionHandler);
+      this.collisionHandler = null;
+    }
+
     Matter.World.remove(this.game.getWorld(), this.body);
     this.sprite.destroy();
   }
