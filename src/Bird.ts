@@ -19,7 +19,7 @@ export class Bird {
   private settleTime: number = 0;
   private collisionHandler: ((event: Matter.IEventCollision<Matter.Engine>) => void) | null = null;
   private isDestroyed: boolean = false;
-  private isSplitBird: boolean = false; // Track if this is a split bird
+  private isSplitBird: boolean = false; 
 
   constructor(type: BirdType, x: number, y: number, game: Game, isSplitBird: boolean = false) {
     this.type = type;
@@ -29,10 +29,20 @@ export class Bird {
     
     this.radius = this.getRadius();
     
+    // Define default collision filter to prevent 'undefined' errors
+    const defaultCollisionFilter = {
+        group: 0,
+        category: 1,
+        mask: 0xFFFFFFFF
+    };
+
     this.body = Matter.Bodies.circle(x, y, this.radius, {
       density: this.getDensity(),
-      restitution: 0.29,
-      friction: 0.3
+      restitution: 0.4,
+      friction: 0.3,
+      frictionAir: 0.001, 
+      // FIXED: Always provide a valid collisionFilter object
+      collisionFilter: isSplitBird ? { group: -1, category: 1, mask: 0xFFFFFFFF } : defaultCollisionFilter
     });
     
     Matter.World.add(this.game.getWorld(), this.body);
@@ -42,7 +52,11 @@ export class Bird {
     
     this.game.getContainer().addChild(this.sprite);
     
-    Matter.Body.setStatic(this.body, true);
+    if (!isSplitBird) {
+        Matter.Body.setStatic(this.body, true);
+    } else {
+        Matter.Body.setStatic(this.body, false);
+    }
     
     this.collisionHandler = (event: Matter.IEventCollision<Matter.Engine>) => {
       this.handleCollision(event);
@@ -244,39 +258,39 @@ export class Bird {
   private splitAbility(): void {
     if (this.isDestroyed) return;
     
-    // FIXED: Blue bird now splits properly
     const velocity = this.body.velocity;
     const position = this.body.position;
     
-    // Calculate current direction
-    const currentAngle = Math.atan2(velocity.y, velocity.x);
     const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+    const currentAngle = Math.atan2(velocity.y, velocity.x);
     
-    // Create 2 additional birds at angles
-    const angles = [currentAngle - 0.4, currentAngle + 0.4]; // 23 degrees up and down
+    const angles = [currentAngle - 0.3, currentAngle + 0.3];
     
+    this.body.collisionFilter.group = -1;
+
     angles.forEach(angle => {
-      // Create split bird with flag
-      const splitBird = new Bird('blue', position.x, position.y, this.game, true);
+      const spawnOffset = 30; 
+      const spawnX = position.x + Math.cos(angle) * spawnOffset;
+      const spawnY = position.y + Math.sin(angle) * spawnOffset;
+
+      const splitBird = new Bird('blue', spawnX, spawnY, this.game, true);
       splitBird.isLaunched = true;
-      splitBird.hasCollided = false; // Split birds haven't collided yet
-      splitBird.abilityUsed = true; // Can't split again
+      splitBird.hasCollided = false; 
+      splitBird.abilityUsed = true; 
       
-      // Make it dynamic
       Matter.Body.setStatic(splitBird.body, false);
+      splitBird.body.collisionFilter.group = -1;
       
-      // Set velocity based on angle
       Matter.Body.setVelocity(splitBird.body, {
-        x: Math.cos(angle) * speed * 0.9, // Slightly slower
-        y: Math.sin(angle) * speed * 0.9
+        x: Math.cos(angle) * speed, 
+        y: Math.sin(angle) * speed
       });
     });
     
-    // Maintain original bird's trajectory
-    Matter.Body.setVelocity(this.body, {
-      x: velocity.x * 0.9,
-      y: velocity.y * 0.9
-    });
+     Matter.Body.setVelocity(this.body, {
+        x: Math.cos(currentAngle) * speed, 
+        y: Math.sin(currentAngle) * speed
+      });
   }
 
   private speedBoostAbility(): void {
